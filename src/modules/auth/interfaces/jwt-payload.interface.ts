@@ -1,4 +1,4 @@
-import { Role } from '../../database/schema/user-roles.schema';
+import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
 
 export interface JwtPayload {
   /** Subject — user ID */

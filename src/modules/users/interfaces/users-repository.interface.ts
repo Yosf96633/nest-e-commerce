@@ -1,5 +1,5 @@
-import { User, NewUser } from '../../database/schema';
-import { Role } from '../../database/schema/user-roles.schema';
+import { User, NewUser } from '../../../infrastructure/database/schema';
+import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
 
 export interface IUsersRepository {
   findById(id: string): Promise<User | undefined>;

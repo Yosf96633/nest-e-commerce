@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { DrizzleUsersRepository } from './repositories/drizzle.users.repository';
+import { DrizzleUsersRepository } from './repositories/drizzle-users.repository';
 import { USERS_REPOSITORY } from './interfaces/users-repository.interface';
-import { UsersController } from './users.controller';
 
 @Module({
   providers: [
@@ -13,6 +12,5 @@ import { UsersController } from './users.controller';
     },
   ],
   exports: [UsersService],
-  controllers: [UsersController],
 })
 export class UsersModule { }

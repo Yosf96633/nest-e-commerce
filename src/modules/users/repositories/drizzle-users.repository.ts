@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DatabaseService } from '../../database/database.service';
+import { DatabaseService } from '../../../infrastructure/database/database.service';
 import {
   users,
   userRoles,
   User,
   NewUser,
-} from '../../database/schema';
-import { Role } from '../../database/schema/user-roles.schema';
+} from '../../../infrastructure/database/schema';
+import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
 
 @Injectable()
