@@ -1,9 +1,11 @@
-import { Body, Controller, HttpCode, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/signup.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { LoginDto } from './dto/login.dto';
-import type { Response } from 'express';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import type { Request, Response } from 'express';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -26,5 +28,23 @@ export class AuthController {
     @HttpCode(200)
     async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
         return this.authService.login(loginDto, res);
+    }
+
+    @Post('refresh')
+    @HttpCode(200)
+    async refresh(
+        @Req() req: Request,
+        @Res({ passthrough: true }) res: Response,
+        @Body() body?: RefreshTokenDto,
+    ) {
+        const refreshToken = req.cookies?.['refresh_token'] || body?.refreshToken;
+        return this.authService.refreshToken(refreshToken, res);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('protected')
+    @HttpCode(200)
+    async protectedRoute(@Req() req: Request & { user: any }) {
+        return this.authService.getProtectedData(req.user.sub);
     }
 }

@@ -40,4 +40,12 @@ export class UsersService {
   async storeRefreshToken(userId: string, refreshToken: string, expiresAt: Date): Promise<RefreshToken> {
     return this.usersRepository.storeRefreshToken(userId, refreshToken, expiresAt);
   }
+
+  async findActiveRefreshTokensByUserId(userId: string): Promise<RefreshToken[]> {
+    return this.usersRepository.findActiveRefreshTokensByUserId(userId);
+  }
+
+  async revokeRefreshToken(tokenId: string, replacedByTokenId?: string): Promise<void> {
+    return this.usersRepository.revokeRefreshToken(tokenId, replacedByTokenId);
+  }
 }

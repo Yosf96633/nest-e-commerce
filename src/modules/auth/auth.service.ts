@@ -7,7 +7,7 @@ import {
   EMAIL_VERIFICATION_TOKEN_REPOSITORY,
   type IEmailVerificationTokenRepository,
 } from './interfaces/email-verification-tokens-repositry.interface';
-import { NewEmailVerificationToken, User } from 'src/infrastructure/database/schema';
+import { NewEmailVerificationToken, RefreshToken, User } from 'src/infrastructure/database/schema';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { ResendService } from 'src/infrastructure/resend/resend.service';
 import { LoginDto } from './dto/login.dto';
@@ -177,13 +177,83 @@ export class AuthService {
       message: "Login successful",
       accessToken,
     };
-
-
-
-
-
-
-
   }
 
+  async refreshToken(refreshTokenFromReq: string, response: Response) {
+    if (!refreshTokenFromReq) {
+      throw new UnauthorizedException('Refresh token is required', 'REFRESH_TOKEN_REQUIRED');
+    }
+
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(refreshTokenFromReq, {
+        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN');
+    }
+
+    const userId = payload.sub;
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
+    }
+
+    const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
+    let matchedTokenRecord: RefreshToken | undefined;
+
+    for (const tokenRecord of activeTokens) {
+      const isValid = await TokenUtility.compareToken(refreshTokenFromReq, tokenRecord.tokenHash);
+      if (isValid) {
+        matchedTokenRecord = tokenRecord;
+        break;
+      }
+    }
+
+    if (!matchedTokenRecord) {
+      throw new UnauthorizedException('Invalid or revoked refresh token', 'INVALID_REFRESH_TOKEN');
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await this.generateAccessAndRefreshToken(user);
+
+    const durationInDays = 15;
+    const expiresAt = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
+    const hashedRefreshToken = await TokenUtility.hashToken(newRefreshToken);
+
+    const newRefreshTokenRecord = await this.userService.storeRefreshToken(
+      user.id,
+      hashedRefreshToken,
+      expiresAt,
+    );
+
+    await this.userService.revokeRefreshToken(matchedTokenRecord.id, newRefreshTokenRecord.id);
+
+    response.cookie('refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: expiresAt,
+      path: '/auth',
+    });
+
+    return {
+      status: true,
+      message: 'Token refreshed successfully',
+      accessToken,
+    };
+  }
+
+  async getProtectedData(userId: string) {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
+    }
+
+    const { passwordHash, ...safeUser } = user;
+    return {
+      status: true,
+      message: 'Access granted to protected route',
+      user: safeUser,
+    };
+  }
 }

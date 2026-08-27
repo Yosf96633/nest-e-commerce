@@ -9,6 +9,8 @@ export interface IUsersRepository {
   getRoles(userId: string): Promise<Role[]>;
   assignRole(userId: string, role: Role): Promise<void>;
   storeRefreshToken(userId: string, refreshToken: string, expiresAt: Date): Promise<RefreshToken>;
+  findActiveRefreshTokensByUserId(userId: string): Promise<RefreshToken[]>;
+  revokeRefreshToken(tokenId: string, replacedByTokenId?: string): Promise<void>;
 }
 
 export const USERS_REPOSITORY = Symbol('IUsersRepository');

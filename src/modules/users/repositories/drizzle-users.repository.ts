@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { DatabaseService } from '../../../infrastructure/database/database.service';
 import {
   users,
@@ -69,4 +69,28 @@ export class DrizzleUsersRepository implements IUsersRepository {
     const result = await this.db.client.insert(refreshTokens).values({ userId, tokenHash: refreshToken, expiresAt }).returning()
     return result[0]
   }
+
+  async findActiveRefreshTokensByUserId(userId: string): Promise<RefreshToken[]> {
+    return this.db.client
+      .select()
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          gt(refreshTokens.expiresAt, new Date()),
+        ),
+      );
+  }
+
+  async revokeRefreshToken(tokenId: string, replacedByTokenId?: string): Promise<void> {
+    await this.db.client
+      .update(refreshTokens)
+      .set({
+        revokedAt: new Date(),
+        replacedBy: replacedByTokenId ?? null,
+      })
+      .where(eq(refreshTokens.id, tokenId));
+  }
 }
+

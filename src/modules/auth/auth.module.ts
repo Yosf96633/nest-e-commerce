@@ -10,6 +10,8 @@ import { DrizzleEmailVeriRepository } from './repositories/drizzle-email-verific
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { JwtModule } from '@nestjs/jwt';
 
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -25,6 +27,7 @@ import { JwtModule } from '@nestjs/jwt';
   providers: [
     AuthService,
     HashingUtil,
+    JwtAuthGuard,
     {
       provide: EMAIL_VERIFICATION_TOKEN_REPOSITORY,
       useClass: DrizzleEmailVeriRepository,
@@ -37,5 +40,6 @@ import { JwtModule } from '@nestjs/jwt';
       inject: [ConfigService],
     },
   ],
+  exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule { }

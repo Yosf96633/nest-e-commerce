@@ -12,11 +12,16 @@ describe('AuthService', () => {
     const emailVerificationTokenRepo = { create: jest.fn().mockResolvedValue({}) };
     const resendService = { send_verification_email: jest.fn().mockResolvedValue('msg-id') };
 
+    const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
+    const configService = { get: jest.fn() };
+
     service = new AuthService(
+      jwtService as any,
       emailVerificationTokenRepo as any,
       userService as any,
       'http://localhost:3000/verify-email',
       resendService as any,
+      configService as any,
     );
   });
 
