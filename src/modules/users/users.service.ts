@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { User, NewUser } from '../../infrastructure/database/schema';
+import { User, NewUser, RefreshToken } from '../../infrastructure/database/schema';
 import { Role } from '../../infrastructure/database/schema/user-roles.schema';
 import {
   type IUsersRepository,
@@ -35,5 +35,9 @@ export class UsersService {
 
   async assignRole(userId: string, role: Role): Promise<void> {
     return this.usersRepository.assignRole(userId, role);
+  }
+
+  async storeRefreshToken(userId: string, refreshToken: string, expiresAt: Date): Promise<RefreshToken> {
+    return this.usersRepository.storeRefreshToken(userId, refreshToken, expiresAt);
   }
 }

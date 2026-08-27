@@ -8,9 +8,19 @@ import { ResendModule } from 'src/infrastructure/resend/resend.module';
 import { EMAIL_VERIFICATION_TOKEN_REPOSITORY } from './interfaces/email-verification-tokens-repositry.interface';
 import { DrizzleEmailVeriRepository } from './repositories/drizzle-email-verification-token.respository';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [UsersModule, ResendModule],
+  imports: [
+    JwtModule.registerAsync({
+      global: true,
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: config.get<string>('NODE_ENV') === 'production' ? '1h' : '2m' },
+      })
+    }),
+    UsersModule, ResendModule],
   controllers: [AuthController],
   providers: [
     AuthService,

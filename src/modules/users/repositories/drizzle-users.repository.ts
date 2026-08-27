@@ -6,6 +6,8 @@ import {
   userRoles,
   User,
   NewUser,
+  refreshTokens,
+  RefreshToken,
 } from '../../../infrastructure/database/schema';
 import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
 import { IUsersRepository } from '../interfaces/users-repository.interface';
@@ -61,5 +63,10 @@ export class DrizzleUsersRepository implements IUsersRepository {
       .insert(userRoles)
       .values({ userId, role })
       .onConflictDoNothing();
+  }
+
+  async storeRefreshToken(userId: string, refreshToken: string, expiresAt: Date): Promise<RefreshToken> {
+    const result = await this.db.client.insert(refreshTokens).values({ userId, tokenHash: refreshToken, expiresAt }).returning()
+    return result[0]
   }
 }

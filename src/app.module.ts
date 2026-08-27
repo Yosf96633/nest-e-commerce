@@ -9,13 +9,13 @@ import { ResendModule } from './infrastructure/resend/resend.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     DatabaseModule,
     AuthModule,
     CloudinaryModule,
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     ResendModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

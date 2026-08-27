@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { SignUpDto } from './dto/signup.dto';
 import { HashingUtil } from './utils/hashing.util';
@@ -7,19 +7,49 @@ import {
   EMAIL_VERIFICATION_TOKEN_REPOSITORY,
   type IEmailVerificationTokenRepository,
 } from './interfaces/email-verification-tokens-repositry.interface';
-import { NewEmailVerificationToken } from 'src/infrastructure/database/schema';
+import { NewEmailVerificationToken, User } from 'src/infrastructure/database/schema';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { ResendService } from 'src/infrastructure/resend/resend.service';
+import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
+
+
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly jwtService: JwtService,
     @Inject(EMAIL_VERIFICATION_TOKEN_REPOSITORY)
     private readonly emailVerificationTokenRepository: IEmailVerificationTokenRepository,
     private readonly userService: UsersService,
     @Inject(EMAIL_VERIFICATION_TOKEN_URL)
     private readonly emailVerificationTokenUrl: string,
-    private readonly resendService: ResendService
+    private readonly resendService: ResendService,
+    private readonly configService: ConfigService
   ) { }
+
+  private async generateAccessAndRefreshToken(user: User): Promise<{ accessToken: string, refreshToken: string }> {
+    //Generate JWT Access Token
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+    })
+    //Generate Refresh Token using jwt and hash it
+    const refreshToken = await this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+    }, {
+      secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
+      expiresIn: this.configService.get<string>('REFRESH_TOKEN_EXPIRATION_TIME') as any,
+    }
+    )
+    return {
+      accessToken,
+      refreshToken
+    }
+  }
+
 
   async signup(signupDto: SignUpDto) {
     const { password, ...userData } = signupDto;
@@ -101,4 +131,59 @@ export class AuthService {
       throw new InternalServerErrorException("Failed to verify email", "EMAIL_VERIFICATION_FAILED");
     }
   }
+
+  async login(loginDto: LoginDto, response: Response) {
+    const { email, password } = loginDto;
+
+    // check if the user exists
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException("Invalid credentials", "INVALID_CREDENTIALS");
+    }
+
+    // check if the user has verified their email
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException("Please verify your email first", "EMAIL_NOT_VERIFIED");
+    }
+
+    // check if the password is valid
+    const isPasswordValid = await TokenUtility.compareToken(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException("Invalid credentials", "INVALID_CREDENTIALS");
+    }
+
+    //generate access and refresh token
+    const { accessToken, refreshToken } = await this.generateAccessAndRefreshToken(user);
+
+    // Store refresh token in the database
+    const durationInDays = 15;
+    // current time + (15 days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
+    const expiresAt = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
+
+    const hashedRefreshToken = await TokenUtility.hashToken(refreshToken);
+    await this.userService.storeRefreshToken(user.id, hashedRefreshToken, expiresAt);
+
+
+    response.cookie("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      expires: expiresAt,
+      path: "/auth",
+    });
+
+    return {
+      status: true,
+      message: "Login successful",
+      accessToken,
+    };
+
+
+
+
+
+
+
+  }
+
 }
