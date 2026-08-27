@@ -1,8 +1,8 @@
-import { ConflictException, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { SignUpDto } from './dto/signup.dto';
 import { HashingUtil } from './utils/hashing.util';
-import { GenerateTokenUtil } from './utils/token.utils';
+import { TokenUtility } from './utils/token.utils';
 import {
   EMAIL_VERIFICATION_TOKEN_REPOSITORY,
   type IEmailVerificationTokenRepository,
@@ -35,8 +35,8 @@ export class AuthService {
     if (!newUser) {
       throw new InternalServerErrorException("Failed to create user", "USER_CREATION_FAILED");
     }
-    const rawToken = GenerateTokenUtil.generateToken();
-    const hashedToken = await GenerateTokenUtil.hashToken(rawToken);
+    const rawToken = TokenUtility.generateToken();
+    const hashedToken = await TokenUtility.hashToken(rawToken);
     const verificationTokenData: NewEmailVerificationToken = {
       userId: newUser.id,
       tokenHash: hashedToken,
@@ -64,5 +64,41 @@ export class AuthService {
       message: "User created successfully and verification email sent",
       user: safeUser,
     };
+  }
+
+  async verifyEmail(token: string, userId: string) {
+    try {
+      // Find the token
+      const tokenRecord = await this.emailVerificationTokenRepository.findValidToken(userId);
+      if (!tokenRecord) {
+        throw new BadRequestException('Invalid or expired verification token', "INVALID_TOKEN");
+      }
+      const isValid = await TokenUtility.compareToken(token, tokenRecord.tokenHash);
+      if (!isValid) {
+        throw new BadRequestException('Invalid or expired verification token', "INVALID_TOKEN");
+      }
+
+      // Check if token is expired
+      const isExpired = tokenRecord.expiresAt < new Date();
+      if (isExpired) {
+        throw new BadRequestException('Invalid or expired verification token', "INVALID_TOKEN");
+      }
+
+      // Mark email as verified
+      await this.userService.markEmailVerified(userId);
+
+      // Delete the token after successful verification
+      await this.emailVerificationTokenRepository.delete(tokenRecord.id);
+
+      return {
+        status: true,
+        message: "Email verified successfully",
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException("Failed to verify email", "EMAIL_VERIFICATION_FAILED");
+    }
   }
 }
