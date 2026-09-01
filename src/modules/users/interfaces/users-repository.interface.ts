@@ -5,6 +5,7 @@ export interface IUsersRepository {
   findById(id: string): Promise<User | undefined>;
   findByEmail(email: string): Promise<User | undefined>;
   create(data: NewUser): Promise<User>;
+  delete(userId: string): Promise<void>;
   markEmailVerified(userId: string): Promise<void>;
   getRoles(userId: string): Promise<Role[]>;
   assignRole(userId: string, role: Role): Promise<void>;

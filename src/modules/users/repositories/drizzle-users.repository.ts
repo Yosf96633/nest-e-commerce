@@ -43,6 +43,12 @@ export class DrizzleUsersRepository implements IUsersRepository {
     return result[0];
   }
 
+  async delete(userId: string): Promise<void> {
+    await this.db.client
+      .delete(users)
+      .where(eq(users.id, userId));
+  }
+
   async markEmailVerified(userId: string): Promise<void> {
     await this.db.client
       .update(users)

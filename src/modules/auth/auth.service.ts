@@ -7,7 +7,7 @@ import {
   EMAIL_VERIFICATION_TOKEN_REPOSITORY,
   type IEmailVerificationTokenRepository,
 } from './interfaces/email-verification-tokens-repositry.interface';
-import { NewEmailVerificationToken, RefreshToken, User } from 'src/infrastructure/database/schema';
+import { EmailVerificationToken, NewEmailVerificationToken, RefreshToken, Role, roleEnum, User } from 'src/infrastructure/database/schema';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { ResendService } from 'src/infrastructure/resend/resend.service';
 import { LoginDto } from './dto/login.dto';
@@ -29,11 +29,12 @@ export class AuthService {
     private readonly configService: ConfigService
   ) { }
 
-  private async generateAccessAndRefreshToken(user: User): Promise<{ accessToken: string, refreshToken: string }> {
+  private async generateAccessAndRefreshToken(user: User, roles: Role[]): Promise<{ accessToken: string, refreshToken: string }> {
     //Generate JWT Access Token
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
+      roles: roles.map((r) => r)
     })
     //Generate Refresh Token using jwt and hash it
     const refreshToken = await this.jwtService.signAsync({
@@ -72,9 +73,9 @@ export class AuthService {
       tokenHash: hashedToken,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     };
-
+    let verificationToken: EmailVerificationToken | undefined;
     try {
-      await this.emailVerificationTokenRepository.create(verificationTokenData);
+      verificationToken = await this.emailVerificationTokenRepository.create(verificationTokenData);
     } catch (error) {
       throw new InternalServerErrorException("Failed to create verification token", "VERIFICATION_TOKEN_CREATION_FAILED");
     }
@@ -85,6 +86,12 @@ export class AuthService {
       await this.resendService.send_verification_email(newUser.email, verificationUrl);
     } catch (error) {
       console.error('Failed to send verification email:', error);
+      // remove the created user
+      await this.userService.delete(newUser.id);
+      // remove the created verification token
+      if (verificationToken) {
+        await this.emailVerificationTokenRepository.delete(verificationToken.id);
+      }
       throw new InternalServerErrorException("Failed to send verification email", "EMAIL_SENDING_FAILED");
     }
 
@@ -116,6 +123,9 @@ export class AuthService {
 
       // Mark email as verified
       await this.userService.markEmailVerified(userId);
+
+      // add role to the user
+      await this.userService.assignRole(userId, roleEnum["0"]);
 
       // Delete the token after successful verification
       await this.emailVerificationTokenRepository.delete(tokenRecord.id);
@@ -152,8 +162,11 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
+    const roles = await this.userService.getRoles(user.id);
+
+
     //generate access and refresh token
-    const { accessToken, refreshToken } = await this.generateAccessAndRefreshToken(user);
+    const { accessToken, refreshToken } = await this.generateAccessAndRefreshToken(user, roles);
 
     // Store refresh token in the database
     const durationInDays = 15;
@@ -198,7 +211,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
-
+    const roles = await this.userService.getRoles(user.id);
     const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
     let matchedTokenRecord: RefreshToken | undefined;
 
@@ -214,7 +227,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or revoked refresh token', 'INVALID_REFRESH_TOKEN');
     }
 
-    const { accessToken, refreshToken: newRefreshToken } = await this.generateAccessAndRefreshToken(user);
+    const { accessToken, refreshToken: newRefreshToken } = await this.generateAccessAndRefreshToken(user, roles);
 
     const durationInDays = 15;
     const expiresAt = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
@@ -245,6 +258,7 @@ export class AuthService {
 
   async getProtectedData(userId: string) {
     const user = await this.userService.findById(userId);
+    const roles = await this.userService.getRoles(userId);
     if (!user) {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
@@ -253,7 +267,57 @@ export class AuthService {
     return {
       status: true,
       message: 'Access granted to protected route',
-      user: safeUser,
+      user: { ...safeUser, roles: roles.map((r) => r) },
+    };
+  }
+
+  async logout(refreshToken: string, response: Response) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required', 'REFRESH_TOKEN_REQUIRED');
+    }
+
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(refreshToken, {
+        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN');
+    }
+
+    const userId = payload.sub;
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
+    }
+
+    const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
+    let matchedTokenRecord: RefreshToken | undefined;
+
+    for (const tokenRecord of activeTokens) {
+      const isValid = await TokenUtility.compareToken(refreshToken, tokenRecord.tokenHash);
+      if (isValid) {
+        matchedTokenRecord = tokenRecord;
+        break;
+      }
+    }
+
+    if (!matchedTokenRecord) {
+      throw new UnauthorizedException('Invalid or revoked refresh token', 'INVALID_REFRESH_TOKEN');
+    }
+
+    await this.userService.revokeRefreshToken(matchedTokenRecord.id);
+
+    response.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/auth',
+    });
+
+    return {
+      status: true,
+      message: 'Logout successful',
     };
   }
 }

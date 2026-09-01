@@ -25,6 +25,10 @@ export class UsersService {
     return this.usersRepository.create(data);
   }
 
+  async delete(userId: string): Promise<void> {
+    return this.usersRepository.delete(userId);
+  }
+
   async markEmailVerified(userId: string): Promise<void> {
     return this.usersRepository.markEmailVerified(userId);
   }

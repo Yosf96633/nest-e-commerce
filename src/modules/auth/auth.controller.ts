@@ -47,4 +47,16 @@ export class AuthController {
     async protectedRoute(@Req() req: Request & { user: any }) {
         return this.authService.getProtectedData(req.user.sub);
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('logout')
+    @HttpCode(200)
+    async logout(
+        @Req() req: Request,
+        @Res({ passthrough: true }) res: Response,
+        @Body() body?: RefreshTokenDto,
+    ) {
+        const refreshToken = req.cookies?.['refresh_token'] || body?.refreshToken;
+        return this.authService.logout(refreshToken, res);
+    }
 }
