@@ -48,6 +48,18 @@ export const stores = pgTable(
      */
     slug: varchar('slug', { length: 255 }).notNull().unique(),
     description: text('description'),
+    /**
+     * Cloudinary profile picture for the store.
+     * NULL until the seller uploads one.
+     */
+    profileImageUrl: text('profile_image_url'),
+    profileImagePublicId: text('profile_image_public_id'),
+    /**
+     * Cloudinary cover/banner image for the store.
+     * NULL until the seller uploads one.
+     */
+    coverImageUrl: text('cover_image_url'),
+    coverImagePublicId: text('cover_image_public_id'),
     status: storeStatusEnum('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

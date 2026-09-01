@@ -6,6 +6,7 @@ import {
   text,
   numeric,
   integer,
+  jsonb,
   timestamp,
   index,
 } from 'drizzle-orm/pg-core';
@@ -21,6 +22,21 @@ export const productStatusEnum = pgEnum('product_status', [
 ]);
 
 export type ProductStatus = (typeof productStatusEnum.enumValues)[number];
+
+// ─── Image Types ──────────────────────────────────────────────────────────────
+
+/**
+ * Represents a single Cloudinary image stored in the products.images JSONB array.
+ * Actual file is stored in Cloudinary; only metadata lives in PostgreSQL.
+ */
+export type ProductImage = {
+  /** Cloudinary delivery URL */
+  url: string;
+  /** Cloudinary public_id — required to delete or replace the asset */
+  publicId: string;
+  /** Zero-based display ordering for gallery rendering */
+  displayOrder: number;
+};
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +71,19 @@ export const products = pgTable(
      * Application layer is responsible for preventing stock from going below 0.
      */
     stock: integer('stock').notNull().default(0),
+    /**
+     * Cloudinary image metadata for this product.
+     * Stored as a JSONB array — actual files live in Cloudinary.
+     *
+     * Business rule: a product must have ≥ 4 images before it can be
+     * activated/published. This is enforced at the service layer, NOT here.
+     *
+     * Default: empty array (valid for draft products with no uploads yet).
+     */
+    images: jsonb('images')
+      .$type<ProductImage[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     status: productStatusEnum('status').notNull().default('draft'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
