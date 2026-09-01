@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 import { users } from './users.schema';
 
 export const emailVerificationTokens = pgTable('email_verification_tokens', {
@@ -24,6 +24,21 @@ export const emailVerificationTokens = pgTable('email_verification_tokens', {
     .notNull()
     .default(sql`now()`),
 });
+
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+export const emailVerificationTokensRelations = relations(
+  emailVerificationTokens,
+  ({ one }) => ({
+    /** The user who this verification token belongs to */
+    user: one(users, {
+      fields: [emailVerificationTokens.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type EmailVerificationToken =
   typeof emailVerificationTokens.$inferSelect;

@@ -2,3 +2,6 @@ export * from './users.schema';
 export * from './user-roles.schema';
 export * from './refresh-tokens.schema';
 export * from './email-verification-tokens.schema';
+export * from './application.schema';
+export * from './store.schema';
+export * from './product.schema';

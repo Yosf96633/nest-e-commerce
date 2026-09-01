@@ -68,6 +68,7 @@ export class AuthService {
     }
     const rawToken = TokenUtility.generateToken();
     const hashedToken = await TokenUtility.hashToken(rawToken);
+    console.log(`token=${rawToken}&userId=${newUser.id}`)
     const verificationTokenData: NewEmailVerificationToken = {
       userId: newUser.id,
       tokenHash: hashedToken,

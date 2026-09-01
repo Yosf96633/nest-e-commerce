@@ -1,7 +1,8 @@
 import { pgTable, uuid, varchar, primaryKey } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 import { users } from './users.schema';
 
-export const roleEnum = ['customer', 'seller', 'admin'] as const;
+export const roleEnum = ['customer', 'seller', 'rider', 'admin'] as const;
 export type Role = (typeof roleEnum)[number];
 
 
@@ -17,6 +18,18 @@ export const userRoles = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.role] })],
 );
+
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  /** The user who holds this role */
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+}));
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type UserRole = typeof userRoles.$inferSelect;
 export type NewUserRole = typeof userRoles.$inferInsert;

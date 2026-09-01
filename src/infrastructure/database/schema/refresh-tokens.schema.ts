@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 import { users } from './users.schema';
 
 export const refreshTokens = pgTable('refresh_tokens', {
@@ -32,6 +32,18 @@ export const refreshTokens = pgTable('refresh_tokens', {
   userAgent: text('user_agent'),
   ipAddress: varchar('ip_address', { length: 45 }),
 });
+
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  /** The user who owns this refresh token */
+  user: one(users, {
+    fields: [refreshTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
