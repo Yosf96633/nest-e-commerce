@@ -4,7 +4,7 @@ import {
   EmailVerificationToken,
   emailVerificationTokens,
 } from 'src/infrastructure/database/schema';
-import { IEmailVerificationTokenRepository } from '../interfaces/email-verification-tokens-repositry.interface';
+import { IEmailVerificationTokenRepository } from '../../../../modules/auth/interfaces/email-verification-tokens-repositry.interface';
 import { DatabaseService } from 'src/infrastructure/database/database.service';
 import { eq } from 'drizzle-orm';
 

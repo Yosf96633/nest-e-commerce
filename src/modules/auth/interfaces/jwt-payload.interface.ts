@@ -4,7 +4,8 @@ export interface JwtPayload {
   /** Subject — user ID */
   sub: string;
   /** User's current roles */
-  roles: Role[];
+  email: string;
+  roles?: Role[];
   /** Issued at (added automatically by @nestjs/jwt) */
   iat?: number;
   /** Expiration (added automatically by @nestjs/jwt) */

@@ -29,12 +29,11 @@ export class AuthService {
     private readonly configService: ConfigService
   ) { }
 
-  private async generateAccessAndRefreshToken(user: User, roles: Role[]): Promise<{ accessToken: string, refreshToken: string }> {
+  private async generateAccessAndRefreshToken(user: User): Promise<{ accessToken: string, refreshToken: string }> {
     //Generate JWT Access Token
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
-      roles: roles.map((r) => r)
     })
     //Generate Refresh Token using jwt and hash it
     const refreshToken = await this.jwtService.signAsync({
@@ -163,11 +162,8 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
-    const roles = await this.userService.getRoles(user.id);
-
-
     //generate access and refresh token
-    const { accessToken, refreshToken } = await this.generateAccessAndRefreshToken(user, roles);
+    const { accessToken, refreshToken } = await this.generateAccessAndRefreshToken(user);
 
     // Store refresh token in the database
     const durationInDays = 15;
@@ -212,7 +208,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
-    const roles = await this.userService.getRoles(user.id);
     const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
     let matchedTokenRecord: RefreshToken | undefined;
 
@@ -228,7 +223,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or revoked refresh token', 'INVALID_REFRESH_TOKEN');
     }
 
-    const { accessToken, refreshToken: newRefreshToken } = await this.generateAccessAndRefreshToken(user, roles);
+    const { accessToken, refreshToken: newRefreshToken } = await this.generateAccessAndRefreshToken(user);
 
     const durationInDays = 15;
     const expiresAt = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);

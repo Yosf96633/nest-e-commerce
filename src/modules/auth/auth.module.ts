@@ -6,11 +6,11 @@ import { UsersModule } from 'src/modules/users/users.module';
 import { HashingUtil } from './utils/hashing.util';
 import { ResendModule } from 'src/infrastructure/resend/resend.module';
 import { EMAIL_VERIFICATION_TOKEN_REPOSITORY } from './interfaces/email-verification-tokens-repositry.interface';
-import { DrizzleEmailVeriRepository } from './repositories/drizzle-email-verification-token.respository';
+import { DrizzleEmailVeriRepository } from "@/infrastructure/database/repositories/email.verification.token/drizzle-email-verification-token.respository";
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { JwtModule } from '@nestjs/jwt';
 
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [

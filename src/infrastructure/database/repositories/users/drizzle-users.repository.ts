@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { DatabaseService } from '../../../infrastructure/database/database.service';
+import { DatabaseService } from '../../database.service';
 import {
   users,
   userRoles,
@@ -8,9 +8,9 @@ import {
   NewUser,
   refreshTokens,
   RefreshToken,
-} from '../../../infrastructure/database/schema';
-import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
-import { IUsersRepository } from '../interfaces/users-repository.interface';
+} from '../../schema';
+import { Role } from '../../schema/user-roles.schema';
+import { IUsersRepository } from '../../../../modules/users/interfaces/users-repository.interface';
 
 @Injectable()
 export class DrizzleUsersRepository implements IUsersRepository {

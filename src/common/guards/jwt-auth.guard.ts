@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import type { JwtPayload } from '@/common/types/jwt-payload.type';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -24,10 +25,10 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.configService.get<string>('JWT_SECRET'),
       });
-      request['user'] = payload;
+      request.user = payload;
     } catch {
       throw new UnauthorizedException('Invalid or expired access token', 'INVALID_ACCESS_TOKEN');
     }
