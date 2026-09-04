@@ -7,6 +7,7 @@ import { CloudinaryModule } from './infrastructure/cloudinary/cloudinary.module'
 import { ConfigModule } from '@nestjs/config';
 import { ResendModule } from './infrastructure/resend/resend.module';
 import { ApplicationModule } from './modules/application/application.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ApplicationModule } from './modules/application/application.module';
     CloudinaryModule,
     ResendModule,
     ApplicationModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
