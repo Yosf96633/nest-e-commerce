@@ -3,7 +3,7 @@ import { Application, NewApplication } from "../../../infrastructure/database/sc
 export interface IApplicationRepository {
     createApplication(application: NewApplication): Promise<Application>;
     // getApplicationById(id: string): Promise<Application | null>;
-    // getAllApplications(): Promise<Application[]>;
+    getAllApplications();
     // updateApplication(id: string, application: Application): Promise<Application>;
     // deleteApplication(id: string): Promise<Application>;
 }

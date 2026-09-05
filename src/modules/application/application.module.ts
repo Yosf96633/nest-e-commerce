@@ -12,6 +12,6 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
     ApplicationService,
     { provide: APPLICATIONS_REPOSITORY, useClass: DrizzleApplicationRepository },
   ],
-  exports: [ApplicationService],
+  exports: [ApplicationService, APPLICATIONS_REPOSITORY],
 })
 export class ApplicationModule { }
