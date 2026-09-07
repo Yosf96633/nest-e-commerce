@@ -13,10 +13,13 @@ export class CloudinaryService {
 
   constructor(@Inject(CLOUDINARY) private readonly cloudinary: typeof Cloudinary) {}
 
-  async uploadImage(file: Express.Multer.File): Promise<UploadApiResponse> {
+  async uploadImage(
+    file: Express.Multer.File,
+    folder = 'e-com',
+  ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
-        { folder: 'e-com' },
+        { folder },
         (
           error: UploadApiErrorResponse | undefined,
           result: UploadApiResponse | undefined,
@@ -31,6 +34,15 @@ export class CloudinaryService {
       );
 
       streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    });
+  }
+
+  async deleteImage(publicId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.cloudinary.uploader.destroy(publicId, (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      });
     });
   }
 }

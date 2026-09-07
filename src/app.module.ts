@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ResendModule } from './infrastructure/resend/resend.module';
 import { ApplicationModule } from './modules/application/application.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SellerModule } from './modules/seller/seller.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AdminModule } from './modules/admin/admin.module';
     ResendModule,
     ApplicationModule,
     AdminModule,
+    SellerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
