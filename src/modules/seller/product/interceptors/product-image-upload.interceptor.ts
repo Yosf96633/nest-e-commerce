@@ -8,7 +8,7 @@ import {
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Observable, of } from 'rxjs';
 import { CloudinaryService } from '@/infrastructure/cloudinary/cloudinary.service';
-import type { ProductImage } from '@/infrastructure/database/schema';
+import type { ProductImage } from '../entities/product.entity';
 
 @Injectable()
 export class ProductImageUploadInterceptor implements NestInterceptor {

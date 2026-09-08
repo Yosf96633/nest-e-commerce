@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { User, NewUser, RefreshToken } from '../../infrastructure/database/schema';
-import { Role } from '../../infrastructure/database/schema/user-roles.schema';
+import { CreateUserData, User } from './entities/user.entity';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { Role } from '@/common/types/role.type';
 import {
   type IUsersRepository,
   USERS_REPOSITORY,
@@ -21,7 +22,7 @@ export class UsersService {
     return this.usersRepository.findByEmail(email);
   }
 
-  async create(data: NewUser): Promise<User> {
+  async create(data: CreateUserData): Promise<User> {
     return this.usersRepository.create(data);
   }
 

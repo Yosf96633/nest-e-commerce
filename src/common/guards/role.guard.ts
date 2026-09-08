@@ -1,13 +1,16 @@
-import { DatabaseService } from "@/infrastructure/database/database.service";
-import { Role, userRoles } from "@/infrastructure/database/schema";
-import { CanActivate, ExecutionContext, Injectable, ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable, ForbiddenException, UnauthorizedException, Inject } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { eq } from "drizzle-orm";
 import type { Request } from "express";
+import { ROLE_READER, type IRoleReader } from '../interfaces/role-reader.interface';
+import { Role } from '../types/role.type';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
-    constructor(private readonly reflector: Reflector, private readonly db: DatabaseService) { }
+    constructor(
+        private readonly reflector: Reflector,
+        @Inject(ROLE_READER)
+        private readonly roleReader: IRoleReader,
+    ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
 
@@ -30,13 +33,7 @@ export class RoleGuard implements CanActivate {
         }
 
         // 2. Fetch the user's roles from the database
-        const rolesResult = await this.db.client
-            .select({ role: userRoles.role })
-            .from(userRoles)
-            .where(eq(userRoles.userId, userID));
-
-        // 3. Flatten the database rows into a primitive array: Role[]
-        const dbUserRoles = rolesResult.map(row => row.role);
+        const dbUserRoles = await this.roleReader.getRoles(userID);
 
         // 4. Check if the user has at least one role required by the route
         const hasPermission = dbUserRoles.some((role) => routeRoles.includes(role));

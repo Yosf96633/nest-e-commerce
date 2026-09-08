@@ -11,7 +11,11 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import type { ProductImage, ProductStatus } from '@/infrastructure/database/schema';
+import {
+  PRODUCT_STATUSES,
+  type ProductImage,
+  type ProductStatus,
+} from '../entities/product.entity';
 
 export class CreateProductDto {
   @IsUUID()
@@ -39,7 +43,7 @@ export class CreateProductDto {
   stock?: number;
 
   @IsOptional()
-  @IsEnum(['draft', 'active', 'inactive'])
+  @IsEnum(PRODUCT_STATUSES)
   status?: ProductStatus;
 
   // Populated by ProductImageUploadInterceptor after Cloudinary upload.

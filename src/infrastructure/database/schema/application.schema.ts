@@ -9,23 +9,24 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 import { users } from './users.schema';
+import {
+    APPLICATION_STATUSES,
+    APPLICATION_TYPES,
+    type ApplicationStatus as DomainApplicationStatus,
+    type ApplicationType as DomainApplicationType,
+} from '@/modules/application/entities/application.entity';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export const applicationTypeEnum = pgEnum('application_type', [
-    'seller',
-    'rider',
-]);
+export const applicationTypeEnum = pgEnum('application_type', APPLICATION_TYPES);
 
-export const applicationStatusEnum = pgEnum('application_status', [
-    'pending',
-    'approved',
-    'rejected',
-]);
+export const applicationStatusEnum = pgEnum(
+    'application_status',
+    APPLICATION_STATUSES,
+);
 
-export type ApplicationType = (typeof applicationTypeEnum.enumValues)[number];
-export type ApplicationStatus =
-    (typeof applicationStatusEnum.enumValues)[number];
+export type ApplicationType = DomainApplicationType;
+export type ApplicationStatus = DomainApplicationStatus;
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 

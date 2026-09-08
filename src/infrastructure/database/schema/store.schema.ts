@@ -14,16 +14,16 @@ import { emailVerificationTokens } from './email-verification-tokens.schema';
 import { userRoles } from './user-roles.schema';
 import { applications } from './application.schema';
 import { products } from './product.schema';
+import {
+  STORE_STATUSES,
+  type StoreStatus as DomainStoreStatus,
+} from '@/modules/seller/store/entities/store.entity';
 
 // ─── Enum ─────────────────────────────────────────────────────────────────────
 
-export const storeStatusEnum = pgEnum('store_status', [
-  'active',
-  'inactive',
-  'suspended',
-]);
+export const storeStatusEnum = pgEnum('store_status', STORE_STATUSES);
 
-export type StoreStatus = (typeof storeStatusEnum.enumValues)[number];
+export type StoreStatus = DomainStoreStatus;
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 

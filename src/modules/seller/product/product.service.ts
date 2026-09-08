@@ -9,7 +9,11 @@ import * as crypto from 'crypto';
 import { IProductRepository } from './interfaces/product.repository.interface';
 import { CreateProductDto } from './dto/create.product.dto';
 import { UpdateProductDto } from './dto/update.product.dto';
-import { Product, NewProduct } from '@/infrastructure/database/schema';
+import {
+  CreateProductData,
+  Product,
+  UpdateProductData,
+} from './entities/product.entity';
 import { StoreService } from '../store/store.service';
 import { CloudinaryService } from '@/infrastructure/cloudinary/cloudinary.service';
 
@@ -83,7 +87,7 @@ export class ProductService {
       );
     }
 
-    const newProduct: NewProduct = {
+    const newProduct: CreateProductData = {
       storeId: store.id,
       name: dto.name,
       slug,
@@ -140,7 +144,7 @@ export class ProductService {
       );
     }
 
-    const updateData: Partial<NewProduct> = {
+    const updateData: UpdateProductData = {
       ...(dto.name && dto.name !== product.name
         ? { name: dto.name, slug: await this.generateUniqueSlug(dto.name) }
         : {}),

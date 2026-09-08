@@ -12,16 +12,17 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 import { stores } from './store.schema';
+import {
+  PRODUCT_STATUSES,
+  type ProductImage,
+  type ProductStatus as DomainProductStatus,
+} from '@/modules/seller/product/entities/product.entity';
 
 // ─── Enum ─────────────────────────────────────────────────────────────────────
 
-export const productStatusEnum = pgEnum('product_status', [
-  'draft',
-  'active',
-  'inactive',
-]);
+export const productStatusEnum = pgEnum('product_status', PRODUCT_STATUSES);
 
-export type ProductStatus = (typeof productStatusEnum.enumValues)[number];
+export type ProductStatus = DomainProductStatus;
 
 // ─── Image Types ──────────────────────────────────────────────────────────────
 
@@ -29,14 +30,7 @@ export type ProductStatus = (typeof productStatusEnum.enumValues)[number];
  * Represents a single Cloudinary image stored in the products.images JSONB array.
  * Actual file is stored in Cloudinary; only metadata lives in PostgreSQL.
  */
-export type ProductImage = {
-  /** Cloudinary delivery URL */
-  url: string;
-  /** Cloudinary public_id — required to delete or replace the asset */
-  publicId: string;
-  /** Zero-based display ordering for gallery rendering */
-  displayOrder: number;
-};
+export type { ProductImage };
 
 // ─── Table ────────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { Role } from '@/infrastructure/database/schema';
+import { Role } from '@/common/types/role.type';
 import { SetMetadata } from '@nestjs/common';
 
 export const Roles = (...roles: Role[]) =>

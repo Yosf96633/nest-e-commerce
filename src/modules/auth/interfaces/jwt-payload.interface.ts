@@ -1,11 +1,11 @@
-import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
+import { AuthRole } from '../types/role.type';
 
 export interface JwtPayload {
   /** Subject — user ID */
   sub: string;
   /** User's current roles */
   email: string;
-  roles?: Role[];
+  roles?: AuthRole[];
   /** Issued at (added automatically by @nestjs/jwt) */
   iat?: number;
   /** Expiration (added automatically by @nestjs/jwt) */

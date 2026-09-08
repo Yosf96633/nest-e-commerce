@@ -8,7 +8,11 @@ import * as crypto from 'crypto';
 import { IStoreRepository } from './interfaces/store.repository.interface';
 import { CreateStoreDto } from './dto/create.store.dto';
 import { UpdateStoreDto } from './dto/update.store.dto';
-import { Store, NewStore } from '@/infrastructure/database/schema';
+import {
+  CreateStoreData,
+  Store,
+  UpdateStoreData,
+} from './entities/store.entity';
 import { CloudinaryService } from '@/infrastructure/cloudinary/cloudinary.service';
 
 @Injectable()
@@ -44,7 +48,7 @@ export class StoreService {
   async createStore(sellerId: string, dto: CreateStoreDto): Promise<Store> {
     const slug = await this.generateUniqueSlug(dto.name);
 
-    const newStore: NewStore = {
+    const newStore: CreateStoreData = {
       sellerId,
       name: dto.name,
       slug,
@@ -127,7 +131,7 @@ export class StoreService {
       newSlug = await this.generateUniqueSlug(dto.name);
     }
 
-    const updateData: Partial<NewStore> = {
+    const updateData: UpdateStoreData = {
       ...(dto.name ? { name: dto.name, slug: newSlug } : {}),
       ...(dto.description !== undefined ? { description: dto.description } : {}),
       ...(dto.profileImageUrl

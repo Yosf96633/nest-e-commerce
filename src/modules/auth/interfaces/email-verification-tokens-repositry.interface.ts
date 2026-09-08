@@ -1,10 +1,12 @@
 import {
+  CreateEmailVerificationTokenData,
   EmailVerificationToken,
-  NewEmailVerificationToken,
-} from 'src/infrastructure/database/schema';
+} from '../entities/email-verification-token.entity';
 
 export interface IEmailVerificationTokenRepository {
-  create(data: NewEmailVerificationToken): Promise<EmailVerificationToken | undefined>;
+  create(
+    data: CreateEmailVerificationTokenData,
+  ): Promise<EmailVerificationToken | undefined>;
   findValidToken(userId: string): Promise<EmailVerificationToken | undefined>;
   delete(id: string): Promise<void>;
 }

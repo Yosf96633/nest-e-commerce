@@ -1,6 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { type IApplicationRepository, APPLICATIONS_REPOSITORY } from './interfaces/application-repository.interface';
-import type { Application, NewApplication } from '../../infrastructure/database/schema/application.schema';
+import type {
+    Application,
+    CreateApplicationData,
+} from './entities/application.entity';
 
 @Injectable()
 export class ApplicationService {
@@ -10,7 +13,7 @@ export class ApplicationService {
         private readonly applicationRepository: IApplicationRepository,
     ) { }
 
-    async createApplication(application: NewApplication): Promise<Application> {
+    async createApplication(application: CreateApplicationData): Promise<Application> {
         const newApplication = await this.applicationRepository.createApplication(application);
         return newApplication;
     }

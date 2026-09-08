@@ -4,13 +4,15 @@ import { DatabaseService } from '../../database.service';
 import {
   users,
   userRoles,
-  User,
-  NewUser,
   refreshTokens,
-  RefreshToken,
 } from '../../schema';
-import { Role } from '../../schema/user-roles.schema';
 import { IUsersRepository } from '../../../../modules/users/interfaces/users-repository.interface';
+import {
+  CreateUserData,
+  User,
+} from '../../../../modules/users/entities/user.entity';
+import { RefreshToken } from '../../../../modules/users/entities/refresh-token.entity';
+import { Role } from '@/common/types/role.type';
 
 @Injectable()
 export class DrizzleUsersRepository implements IUsersRepository {
@@ -22,7 +24,7 @@ export class DrizzleUsersRepository implements IUsersRepository {
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
-    return result[0];
+    return result[0] ? this.toUser(result[0]) : undefined;
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
@@ -31,16 +33,20 @@ export class DrizzleUsersRepository implements IUsersRepository {
       .from(users)
       .where(eq(users.email, email))
       .limit(1);
-    return result[0];
+    return result[0] ? this.toUser(result[0]) : undefined;
   }
 
 
-  async create(data: NewUser): Promise<User> {
-    const result = await this.db.client
-      .insert(users)
-      .values(data)
-      .returning();
-    return result[0];
+  async create(data: CreateUserData): Promise<User> {
+    const result = await this.db.client.insert(users).values({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phoneNumber: data.phoneNumber,
+      passwordHash: data.passwordHash,
+      profileImage: data.profileImage,
+    }).returning();
+    return this.toUser(result[0]);
   }
 
   async delete(userId: string): Promise<void> {
@@ -73,11 +79,11 @@ export class DrizzleUsersRepository implements IUsersRepository {
 
   async storeRefreshToken(userId: string, refreshToken: string, expiresAt: Date): Promise<RefreshToken> {
     const result = await this.db.client.insert(refreshTokens).values({ userId, tokenHash: refreshToken, expiresAt }).returning()
-    return result[0]
+    return this.toRefreshToken(result[0])
   }
 
   async findActiveRefreshTokensByUserId(userId: string): Promise<RefreshToken[]> {
-    return this.db.client
+    const result = await this.db.client
       .select()
       .from(refreshTokens)
       .where(
@@ -87,6 +93,7 @@ export class DrizzleUsersRepository implements IUsersRepository {
           gt(refreshTokens.expiresAt, new Date()),
         ),
       );
+    return result.map((token) => this.toRefreshToken(token));
   }
 
   async revokeRefreshToken(tokenId: string, replacedByTokenId?: string): Promise<void> {
@@ -98,5 +105,35 @@ export class DrizzleUsersRepository implements IUsersRepository {
       })
       .where(eq(refreshTokens.id, tokenId));
   }
-}
 
+  private toUser(record: typeof users.$inferSelect): User {
+    return {
+      id: record.id,
+      firstName: record.firstName,
+      lastName: record.lastName,
+      email: record.email,
+      phoneNumber: record.phoneNumber,
+      passwordHash: record.passwordHash,
+      profileImage: record.profileImage,
+      isEmailVerified: record.isEmailVerified,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+
+  private toRefreshToken(
+    record: typeof refreshTokens.$inferSelect,
+  ): RefreshToken {
+    return {
+      id: record.id,
+      userId: record.userId,
+      tokenHash: record.tokenHash,
+      expiresAt: record.expiresAt,
+      createdAt: record.createdAt,
+      revokedAt: record.revokedAt,
+      replacedBy: record.replacedBy,
+      userAgent: record.userAgent,
+      ipAddress: record.ipAddress,
+    };
+  }
+}

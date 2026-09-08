@@ -1,5 +1,4 @@
 import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
-import { UsersService } from '../users/users.service';
 import { SignUpDto } from './dto/signup.dto';
 import { HashingUtil } from './utils/hashing.util';
 import { TokenUtility } from './utils/token.utils';
@@ -7,7 +6,16 @@ import {
   EMAIL_VERIFICATION_TOKEN_REPOSITORY,
   type IEmailVerificationTokenRepository,
 } from './interfaces/email-verification-tokens-repositry.interface';
-import { EmailVerificationToken, NewEmailVerificationToken, RefreshToken, Role, roleEnum, User } from 'src/infrastructure/database/schema';
+import {
+  AUTH_USERS,
+  type IAuthUsers,
+} from './interfaces/auth-users.interface';
+import type { AuthUser } from './entities/auth-user.entity';
+import type {
+  CreateEmailVerificationTokenData,
+  EmailVerificationToken,
+} from './entities/email-verification-token.entity';
+import type { AuthRefreshToken } from './entities/refresh-token.entity';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { ResendService } from 'src/infrastructure/resend/resend.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,14 +30,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @Inject(EMAIL_VERIFICATION_TOKEN_REPOSITORY)
     private readonly emailVerificationTokenRepository: IEmailVerificationTokenRepository,
-    private readonly userService: UsersService,
+    @Inject(AUTH_USERS)
+    private readonly userService: IAuthUsers,
     @Inject(EMAIL_VERIFICATION_TOKEN_URL)
     private readonly emailVerificationTokenUrl: string,
     private readonly resendService: ResendService,
     private readonly configService: ConfigService
   ) { }
 
-  private async generateAccessAndRefreshToken(user: User): Promise<{ accessToken: string, refreshToken: string }> {
+  private async generateAccessAndRefreshToken(user: AuthUser): Promise<{ accessToken: string, refreshToken: string }> {
     //Generate JWT Access Token
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
@@ -68,7 +77,7 @@ export class AuthService {
     const rawToken = TokenUtility.generateToken();
     const hashedToken = await TokenUtility.hashToken(rawToken);
     console.log(`token=${rawToken}&userId=${newUser.id}`)
-    const verificationTokenData: NewEmailVerificationToken = {
+    const verificationTokenData: CreateEmailVerificationTokenData = {
       userId: newUser.id,
       tokenHash: hashedToken,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -125,7 +134,7 @@ export class AuthService {
       await this.userService.markEmailVerified(userId);
 
       // add role to the user
-      await this.userService.assignRole(userId, roleEnum["0"]);
+      await this.userService.assignRole(userId, 'customer');
 
       // Delete the token after successful verification
       await this.emailVerificationTokenRepository.delete(tokenRecord.id);
@@ -209,7 +218,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
     const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
-    let matchedTokenRecord: RefreshToken | undefined;
+    let matchedTokenRecord: AuthRefreshToken | undefined;
 
     for (const tokenRecord of activeTokens) {
       const isValid = await TokenUtility.compareToken(refreshTokenFromReq, tokenRecord.tokenHash);
@@ -288,7 +297,7 @@ export class AuthService {
     }
 
     const activeTokens = await this.userService.findActiveRefreshTokensByUserId(userId);
-    let matchedTokenRecord: RefreshToken | undefined;
+    let matchedTokenRecord: AuthRefreshToken | undefined;
 
     for (const tokenRecord of activeTokens) {
       const isValid = await TokenUtility.compareToken(refreshToken, tokenRecord.tokenHash);

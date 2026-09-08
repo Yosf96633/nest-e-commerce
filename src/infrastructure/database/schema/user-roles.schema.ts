@@ -1,9 +1,10 @@
 import { pgTable, uuid, varchar, primaryKey } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { users } from './users.schema';
+import { ROLE_VALUES, type Role } from '@/common/types/role.type';
 
-export const roleEnum = ['customer', 'seller', 'rider', 'admin'] as const;
-export type Role = (typeof roleEnum)[number];
+export const roleEnum = ROLE_VALUES;
+export type { Role };
 
 
 export const userRoles = pgTable(

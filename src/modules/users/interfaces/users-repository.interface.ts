@@ -1,10 +1,11 @@
-import { User, NewUser, RefreshToken } from '../../../infrastructure/database/schema';
-import { Role } from '../../../infrastructure/database/schema/user-roles.schema';
+import { CreateUserData, User } from '../entities/user.entity';
+import { RefreshToken } from '../entities/refresh-token.entity';
+import { Role } from '@/common/types/role.type';
 
 export interface IUsersRepository {
   findById(id: string): Promise<User | undefined>;
   findByEmail(email: string): Promise<User | undefined>;
-  create(data: NewUser): Promise<User>;
+  create(data: CreateUserData): Promise<User>;
   delete(userId: string): Promise<void>;
   markEmailVerified(userId: string): Promise<void>;
   getRoles(userId: string): Promise<Role[]>;

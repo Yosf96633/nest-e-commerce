@@ -11,6 +11,8 @@ import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
 import { JwtModule } from '@nestjs/jwt';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { UsersService } from '../users/users.service';
+import { AUTH_USERS } from './interfaces/auth-users.interface';
 
 @Module({
   imports: [
@@ -28,6 +30,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
     AuthService,
     HashingUtil,
     JwtAuthGuard,
+    {
+      provide: AUTH_USERS,
+      useExisting: UsersService,
+    },
     {
       provide: EMAIL_VERIFICATION_TOKEN_REPOSITORY,
       useClass: DrizzleEmailVeriRepository,

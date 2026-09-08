@@ -1,11 +1,15 @@
-import { UpdateApplicationDto } from "@/modules/admin/dto/update-application.dto";
-import { Application, NewApplication } from "../../../infrastructure/database/schema/application.schema"
+import {
+    Application,
+    ApplicationListItem,
+    CreateApplicationData,
+    ReviewApplicationData,
+} from '../entities/application.entity';
 
 export interface IApplicationRepository {
-    createApplication(application: NewApplication): Promise<Application>;
+    createApplication(application: CreateApplicationData): Promise<Application>;
     // getApplicationById(id: string): Promise<Application | null>;
-    getAllApplications();
-    approve_or_rejectApplication(id: string, data: UpdateApplicationDto): Promise<Application>;
+    getAllApplications(): Promise<ApplicationListItem[]>;
+    approve_or_rejectApplication(id: string, data: ReviewApplicationData): Promise<Application>;
 
     // deleteApplication(id: string): Promise<Application>;
 }
