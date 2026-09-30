@@ -1,98 +1,159 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# E-Commerce API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A REST API for an e-commerce platform built with NestJS, TypeScript, PostgreSQL, and Drizzle ORM. It provides authentication, email verification, seller applications, role-based access control, store management, product management, and Cloudinary-backed image uploads.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tech stack
 
-## Description
+- NestJS 11 and TypeScript
+- PostgreSQL (Neon serverless driver)
+- Drizzle ORM and Drizzle Kit
+- JWT access and refresh tokens
+- class-validator and class-transformer
+- Resend for verification emails
+- Cloudinary for store and product images
+- Jest for unit and end-to-end tests
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Requirements
 
-## Project setup
+- Node.js 20 or newer
+- pnpm
+- A PostgreSQL database
+- Resend and Cloudinary accounts for email and image features
+
+## Getting started
+
+Install dependencies:
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+Create a `.env` file in the project root:
+
+```dotenv
+NODE_ENV=development
+PORT=3000
+
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+
+JWT_SECRET=replace-with-a-secure-secret
+REFRESH_TOKEN_SECRET=replace-with-another-secure-secret
+REFRESH_TOKEN_EXPIRATION_TIME=7d
+EMAIL_VERIFICATION_TOKEN_URL=http://localhost:3000/verify-email
+
+RESEND_API_KEY=re_your_api_key
+
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+Apply the existing database migrations:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm db:migrate
 ```
 
-## Run tests
+Start the development server:
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+pnpm start:dev
 ```
 
-## Deployment
+The API listens on `http://localhost:3000` by default.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Available commands
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Command | Description |
+| --- | --- |
+| `pnpm start` | Start the application |
+| `pnpm start:dev` | Start in watch mode |
+| `pnpm build` | Build the production bundle |
+| `pnpm start:prod` | Run the built application |
+| `pnpm lint` | Lint and fix TypeScript files |
+| `pnpm format` | Format source and test files |
+| `pnpm test` | Run unit tests |
+| `pnpm test:e2e` | Run end-to-end tests |
+| `pnpm test:cov` | Run tests with coverage |
+| `pnpm db:generate` | Generate a migration from schema changes |
+| `pnpm db:migrate` | Apply database migrations |
+| `pnpm db:push` | Push the schema directly to the database |
+| `pnpm db:studio` | Open Drizzle Studio |
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+## API overview
+
+Routes that require authentication expect a bearer access token:
+
+```http
+Authorization: Bearer <access-token>
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The refresh token can be supplied through the `refresh_token` cookie or in the request body.
 
-## Resources
+### Authentication
 
-Check out a few resources that may come in handy when working with NestJS:
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/auth/signup` | Register a user and send a verification email |
+| `POST` | `/auth/verify-email` | Verify an email using `token` and `userId` query parameters |
+| `POST` | `/auth/login` | Sign in and issue access and refresh tokens |
+| `POST` | `/auth/refresh` | Rotate a refresh token |
+| `GET` | `/auth/protected` | Test an authenticated request |
+| `POST` | `/auth/logout` | Revoke the refresh token |
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Applications and administration
 
-## Support
+| Method | Route | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/application/create` | Authenticated | Apply for the `seller` or `rider` role |
+| `GET` | `/admin/applications` | Admin | List submitted applications |
+| `PATCH` | `/admin/approve-applications/:id` | Admin | Approve an application |
+| `PATCH` | `/admin/reject-applications/:id` | Admin | Reject an application |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Stores
 
-## Stay in touch
+| Method | Route | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/store` | Seller | Create a store |
+| `GET` | `/store/my-stores` | Seller | List the current seller's stores |
+| `GET` | `/store/seller/:sellerId` | Authenticated | List stores for a seller |
+| `GET` | `/store/id/:id` | Authenticated | Get a store by ID |
+| `GET` | `/store/:slug` | Authenticated | Get a store by slug |
+| `PATCH` | `/store/:id` | Seller | Update a store |
+| `DELETE` | `/store/:id` | Seller | Delete a store |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Store create and update requests accept `multipart/form-data` image fields named `profileImage` and `coverImage`. Each image may be up to 5 MB and must be JPG, JPEG, PNG, or WebP.
+
+### Products
+
+| Method | Route | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/product` | Seller | Create a product |
+| `GET` | `/product/my-products` | Seller | List the current seller's products |
+| `GET` | `/product/id/:id` | Seller | Get a product by ID |
+| `GET` | `/product/slug/:slug` | Seller | Get a product by slug |
+| `PATCH` | `/product/:id` | Seller | Update a product |
+| `DELETE` | `/product/:id` | Seller | Delete a product |
+
+Product create and update requests accept up to 10 images in a `multipart/form-data` field named `images`. Each image may be up to 5 MB and must be JPG, JPEG, PNG, or WebP.
+
+## Project structure
+
+```text
+src/
+├── common/                  # Decorators, guards, and shared types
+├── infrastructure/
+│   ├── cloudinary/          # Image storage integration
+│   ├── database/            # Drizzle schema and repositories
+│   └── resend/              # Transactional email integration
+└── modules/
+    ├── admin/               # Application review endpoints
+    ├── application/         # Seller and rider applications
+    ├── auth/                # Authentication and email verification
+    ├── seller/              # Store and product management
+    └── users/               # User domain and persistence
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is private and unlicensed.

@@ -1,8 +1,6 @@
 import { IsEnum } from 'class-validator';
-import {
-    APPLICATION_TYPES,
-    ApplicationType,
-} from '../entities/application.entity';
+import { APPLICATION_TYPES } from '../entities/application.entity';
+import type { ApplicationType } from '../entities/application.entity';
 
 export class CreateApplicationDto {
     /**
@@ -12,5 +10,5 @@ export class CreateApplicationDto {
     @IsEnum(APPLICATION_TYPES, {
         message: `type must be one of: ${APPLICATION_TYPES.join(', ')}`,
     })
-    type: ApplicationType;
+    type!: ApplicationType;
 }
