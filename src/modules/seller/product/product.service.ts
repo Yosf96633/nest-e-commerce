@@ -16,6 +16,7 @@ import {
 } from './entities/product.entity';
 import { StoreService } from '../store/store.service';
 import { CloudinaryService } from '@/infrastructure/cloudinary/cloudinary.service';
+import { isUUID } from 'class-validator';
 
 @Injectable()
 export class ProductService {
@@ -60,7 +61,10 @@ export class ProductService {
     return store;
   }
 
-  private async getOwnedProduct(id: string, sellerId: string): Promise<Product> {
+  private async getOwnedProduct(
+    id: string,
+    sellerId: string,
+  ): Promise<Product> {
     const product = await this.productRepository.findById(id);
     if (!product) {
       throw new NotFoundException(
@@ -74,15 +78,18 @@ export class ProductService {
     return product;
   }
 
-  async createProduct(sellerId: string, dto: CreateProductDto): Promise<Product> {
+  async createProduct(
+    sellerId: string,
+    dto: CreateProductDto,
+  ): Promise<Product> {
     const store = await this.getOwnedStore(dto.storeId, sellerId);
     const slug = await this.generateUniqueSlug(dto.name);
-    const images = dto.images ?? [];
+    const images = dto.images;
     const status = dto.status ?? 'draft';
 
-    if (status === 'active' && images.length < 4) {
+    if (images.length < 4) {
       throw new BadRequestException(
-        'At least 4 images are required to activate a product',
+        'At least 4 images are required to create a product',
         'PRODUCT_IMAGES_REQUIRED',
       );
     }
@@ -109,16 +116,16 @@ export class ProductService {
     return productsByStore.flat();
   }
 
-  async getProductById(id: string, sellerId: string): Promise<Product> {
-    return this.getOwnedProduct(id, sellerId);
-  }
+  async getProduct(identifier: string, sellerId: string): Promise<Product> {
+    let product = isUUID(identifier)
+      ? await this.productRepository.findById(identifier)
+      : undefined;
 
-  async getProductBySlug(slug: string, sellerId: string): Promise<Product> {
-    const product = await this.productRepository.findBySlug(slug);
+    product ??= await this.productRepository.findBySlug(identifier);
 
     if (!product) {
       throw new NotFoundException(
-        `Product with slug '${slug}' not found`,
+        `Product '${identifier}' not found`,
         'PRODUCT_NOT_FOUND',
       );
     }
@@ -148,7 +155,9 @@ export class ProductService {
       ...(dto.name && dto.name !== product.name
         ? { name: dto.name, slug: await this.generateUniqueSlug(dto.name) }
         : {}),
-      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
       ...(dto.price !== undefined ? { price: dto.price.toFixed(2) } : {}),
       ...(dto.stock !== undefined ? { stock: dto.stock } : {}),
       ...(dto.images !== undefined ? { images: dto.images } : {}),
@@ -158,18 +167,29 @@ export class ProductService {
 
     if (dto.images?.length && product.images.length) {
       await Promise.all(
-        product.images.map((image) => this.cloudinaryService.deleteImage(image.publicId).catch(() => undefined)),
+        product.images.map((image) =>
+          this.cloudinaryService
+            .deleteImage(image.publicId)
+            .catch(() => undefined),
+        ),
       );
     }
 
     return this.productRepository.updateProduct(id, updateData);
   }
 
-  async deleteProduct(id: string, sellerId: string): Promise<{ message: string }> {
+  async deleteProduct(
+    id: string,
+    sellerId: string,
+  ): Promise<{ message: string }> {
     const product = await this.getOwnedProduct(id, sellerId);
 
     await Promise.all(
-      product.images.map((image) => this.cloudinaryService.deleteImage(image.publicId).catch(() => undefined)),
+      product.images.map((image) =>
+        this.cloudinaryService
+          .deleteImage(image.publicId)
+          .catch(() => undefined),
+      ),
     );
     await this.productRepository.deleteProduct(id);
 

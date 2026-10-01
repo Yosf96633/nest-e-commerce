@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayMinSize,
   IsEnum,
   IsInt,
   IsNumber,
@@ -47,7 +48,7 @@ export class CreateProductDto {
   status?: ProductStatus;
 
   // Populated by ProductImageUploadInterceptor after Cloudinary upload.
-  @IsOptional()
   @IsArray()
-  images?: ProductImage[];
+  @ArrayMinSize(4, { message: 'At least 4 images are required' })
+  images: ProductImage[];
 }

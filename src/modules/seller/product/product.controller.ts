@@ -45,24 +45,14 @@ export class ProductController {
     return this.productService.getMyProducts(user.sub);
   }
 
-  @Get('id/:id')
+  @Get(':identifier')
   @HttpCode(HttpStatus.OK)
   @Roles('seller')
-  async getProductById(
-    @Param('id', new ParseUUIDPipe()) id: string,
+  async getProduct(
+    @Param('identifier') identifier: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.productService.getProductById(id, user.sub);
-  }
-
-  @Get('slug/:slug')
-  @HttpCode(HttpStatus.OK)
-  @Roles('seller')
-  async getProductBySlug(
-    @Param('slug') slug: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.productService.getProductBySlug(slug, user.sub);
+    return this.productService.getProduct(identifier, user.sub);
   }
 
   @Patch(':id')

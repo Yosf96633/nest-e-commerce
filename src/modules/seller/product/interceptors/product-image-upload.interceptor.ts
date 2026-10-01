@@ -41,11 +41,23 @@ export class ProductImageUploadInterceptor implements NestInterceptor {
   ): Promise<Observable<any>> {
     await this.multerInterceptor.intercept(context, { handle: () => of(null) });
 
-    const request = context.switchToHttp().getRequest();
-    const files = request.files as { images?: Express.Multer.File[] };
+    const request = context.switchToHttp().getRequest<{
+      method: string;
+      files?: { images?: Express.Multer.File[] };
+      body?: { images?: ProductImage[] };
+    }>();
+    const files = request.files;
     request.body ??= {};
 
     const imageFiles = files?.images ?? [];
+
+    if (request.method === 'POST' && imageFiles.length < 4) {
+      throw new BadRequestException(
+        'At least 4 images are required to create a product',
+        'PRODUCT_IMAGES_REQUIRED',
+      );
+    }
+
     const images: ProductImage[] = await Promise.all(
       imageFiles.map(async (file, index) => {
         const result = await this.cloudinaryService.uploadImage(
