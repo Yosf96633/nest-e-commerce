@@ -1,6 +1,7 @@
 import {
     Application,
     ApplicationListItem,
+    ApplicationStatus,
     CreateApplicationData,
     ReviewApplicationData,
 } from '../entities/application.entity';
@@ -8,7 +9,7 @@ import {
 export interface IApplicationRepository {
     createApplication(application: CreateApplicationData): Promise<Application>;
     // getApplicationById(id: string): Promise<Application | null>;
-    getAllApplications(): Promise<ApplicationListItem[]>;
+    getAllApplications(status?: ApplicationStatus): Promise<ApplicationListItem[]>;
     approve_or_rejectApplication(id: string, data: ReviewApplicationData): Promise<Application>;
 
     // deleteApplication(id: string): Promise<Application>;

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { APPLICATIONS_REPOSITORY, type IApplicationRepository } from '../application/interfaces/application-repository.interface';
-import { Application } from '../application/entities/application.entity';
+import { Application, ApplicationStatus } from '../application/entities/application.entity';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { UsersService } from '../users/users.service';
 @Injectable()
@@ -12,8 +12,8 @@ export class AdminService {
         private readonly userService: UsersService,
     ) { }
 
-    async viewAllApplication() {
-        const applications = await this.applicationRepository.getAllApplications()
+    async viewAllApplication(status?: ApplicationStatus) {
+        const applications = await this.applicationRepository.getAllApplications(status)
         return applications;
     }
 

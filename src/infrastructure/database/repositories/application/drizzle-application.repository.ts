@@ -3,6 +3,7 @@ import { applications } from "../../../database/schema/application.schema";
 import {
     Application,
     ApplicationListItem,
+    ApplicationStatus,
     CreateApplicationData,
     ReviewApplicationData,
 } from '../../../../modules/application/entities/application.entity';
@@ -23,8 +24,9 @@ export class DrizzleApplicationRepository implements IApplicationRepository {
         return this.toEntity(result[0]);
     }
 
-    async getAllApplications(): Promise<ApplicationListItem[]> {
+    async getAllApplications(status?: ApplicationStatus): Promise<ApplicationListItem[]> {
         const records = await this.db.client.query.applications.findMany({
+            where: status ? eq(applications.status, status) : undefined,
             columns: {
                 userId: false,
                 updatedAt: false,
