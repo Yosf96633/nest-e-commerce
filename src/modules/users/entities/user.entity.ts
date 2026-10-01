@@ -1,3 +1,5 @@
+import type { Role } from '@/common/types/role.type';
+
 export interface User {
   id: string;
   firstName: string;
@@ -6,6 +8,7 @@ export interface User {
   phoneNumber: string | null;
   passwordHash: string;
   profileImage: string | null;
+  profileImagePublicId: string | null;
   isEmailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -18,4 +21,19 @@ export interface CreateUserData {
   phoneNumber?: string | null;
   passwordHash: string;
   profileImage?: string | null;
+  profileImagePublicId?: string | null;
+}
+
+export interface UpdateUserData {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string | null;
+  profileImage?: string | null;
+  profileImagePublicId?: string | null;
+}
+
+export type UserProfile = Omit<User, 'passwordHash' | 'profileImagePublicId'>;
+
+export interface UserWithRoles extends UserProfile {
+  roles: Role[];
 }
