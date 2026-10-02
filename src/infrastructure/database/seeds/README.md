@@ -7,32 +7,29 @@ tables:
 - configurable sellers and customers;
 - one or more stores for every seller;
 - configurable products for every store;
-- four unique Cloudinary assets for every product.
+- one Cloudinary image for every product record.
 
 Reviews are not included yet because the project does not currently have a
 review schema. Add review records to this seed after that schema is introduced.
 
 ## Add the source images
 
-The catalog already contains 20 distinct product directories. Each directory
-contains its database information and four copyable image prompts. Add your
-generated images to the same directory:
+The catalog has 20 distinct product directories and one generated shared
+placeholder image. The shared image is already saved locally. You can run the
+seed without generating any more images:
 
 ```text
 product-images/
+├── shared-product.png
 └── wireless-headphones/
     ├── product.json
-    ├── PROMPTS.md
-    ├── 01-front.png
-    ├── 02-left-angle.png
-    ├── 03-right-angle.png
-    └── 04-back-detail.png
+    └── PROMPTS.md
 ```
 
-Start with the ready-made
-[`wireless-headphones/PROMPTS.md`](./product-images/wireless-headphones/PROMPTS.md).
-After generating the images, save them in that same `wireless-headphones`
-directory. Supported extensions are `.png`, `.jpg`, `.jpeg`, and `.webp`.
+The per-product prompts are optional. To replace the shared placeholder for
+one product, generate one image from that product's `PROMPTS.md` and save it in
+the same directory as `product.png`. Supported extensions are `.png`, `.jpg`,
+`.jpeg`, and `.webp`.
 
 The seeder discovers every child directory and creates **one product from each
 directory in each store**. It uses the `name`, `description`, `price`, `stock`,
@@ -40,7 +37,7 @@ and `status` from that directory's `product.json`. You can add more products by
 creating more directories with the same structure. It never invents numbered
 copies to fill a target count.
 
-Every local image is uploaded separately for every created database product.
+The selected local image is uploaded separately for every created database product.
 The returned Cloudinary `secure_url` and `public_id` are stored in the matching
 product's `images` JSONB column.
 
@@ -52,7 +49,7 @@ To validate the 20 product JSON files before generating images:
 npm run db:seed:check-metadata
 ```
 
-After placing exactly four images in every product directory:
+To check that every product has either one local image or the shared fallback:
 
 ```bash
 npm run db:seed:check
@@ -67,7 +64,7 @@ npm run db:seed
 ```
 
 The defaults create 23 users, 3 stores, 60 product records (20 distinct
-products per store), and 240 independently owned Cloudinary assets. Each user
+products per store), and 60 independently owned Cloudinary assets. Each user
 is inserted first and assigned its role. The database returns each seller's ID,
 which is saved as `stores.seller_id`; it then returns each store's ID, which is
 saved as `products.store_id`. All seeded accounts use `SeedUser123!` unless

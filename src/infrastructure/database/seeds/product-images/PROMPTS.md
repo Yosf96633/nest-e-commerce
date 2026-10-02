@@ -1,26 +1,22 @@
 # Product image catalog
 
-Every child directory represents one actual product and must contain:
+The root image, `shared-product.png`, is a neutral product placeholder. The
+seeder uses this single local image for all 20 product definitions by default.
+For safe independent deletion, it uploads a separate Cloudinary copy for each
+product record.
+
+Each child directory contains its own `product.json` and one optional product
+image prompt:
 
 ```text
-product-name/
-├── product.json
-├── PROMPTS.md
-├── 01-front.png
-├── 02-left-angle.png
-├── 03-right-angle.png
-└── 04-back-detail.png
+product-images/
+├── shared-product.png
+└── wireless-headphones/
+    ├── product.json
+    └── PROMPTS.md
 ```
 
-The catalog includes 20 distinct product directories. Each `product.json`
-contains exact product information, and each `PROMPTS.md` contains four
-ready-to-copy prompts for that specific product. Start with
-[`wireless-headphones`](./wireless-headphones/), then continue through the other
-directories.
-
-To add another product, copy the complete `wireless-headphones` directory,
-rename it with a URL-friendly name, update `product.json`, replace the prompts,
-and generate its four images. Do not place images directly in this root folder.
-
-The seeder creates one record for each directory in every store. It reads the
-returned seller ID for each store and the returned store ID for each product.
+You do not need to generate anything to use the shared image. If you later want
+a matching image for one product, generate one from that folder's prompt and
+save it in the folder as `product.png`. That product will use its own image;
+the other products continue using the shared placeholder.

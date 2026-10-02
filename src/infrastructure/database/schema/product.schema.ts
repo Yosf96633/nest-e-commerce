@@ -69,7 +69,7 @@ export const products = pgTable(
      * Cloudinary image metadata for this product.
      * Stored as a JSONB array — actual files live in Cloudinary.
      *
-     * Business rule: a product must have ≥ 4 images before it can be
+     * Business rule: a product must have ≥ 1 image before it can be
      * activated/published. This is enforced at the service layer, NOT here.
      *
      * Default: empty array (valid for draft products with no uploads yet).

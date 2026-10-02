@@ -51,9 +51,9 @@ export class ProductImageUploadInterceptor implements NestInterceptor {
 
     const imageFiles = files?.images ?? [];
 
-    if (request.method === 'POST' && imageFiles.length < 4) {
+    if (request.method === 'POST' && imageFiles.length < 1) {
       throw new BadRequestException(
-        'At least 4 images are required to create a product',
+        'At least 1 image is required to create a product',
         'PRODUCT_IMAGES_REQUIRED',
       );
     }

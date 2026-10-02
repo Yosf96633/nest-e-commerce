@@ -133,6 +133,18 @@ async function findProductFixtures(
   requireImages = true,
 ): Promise<ProductFixture[]> {
   const entries = await fs.readdir(directory, { withFileTypes: true });
+  const sharedImages = entries
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.startsWith('shared-product.') &&
+        IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()),
+    )
+    .map((entry) => path.join(directory, entry.name));
+  if (sharedImages.length > 1) {
+    throw new Error(`Keep only one shared-product image in ${directory}`);
+  }
+  const sharedImagePath = sharedImages[0];
   const productDirectories = entries
     .filter((entry) => entry.isDirectory())
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -144,7 +156,7 @@ async function findProductFixtures(
   }
 
   const fixtures: ProductFixture[] = [];
-  const missingImages: string[] = [];
+  const imageErrors: string[] = [];
   for (const entry of productDirectories) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name)) {
       throw new Error(
@@ -179,21 +191,29 @@ async function findProductFixtures(
       .map((productEntry) => path.join(productDirectory, productEntry.name))
       .sort();
 
-    if (imagePaths.length !== 4) {
-      missingImages.push(`${entry.name} (${imagePaths.length}/4 images)`);
+    if (imagePaths.length > 1) {
+      imageErrors.push(
+        `${entry.name} has ${imagePaths.length} images; keep one`,
+      );
+    } else if (imagePaths.length === 0 && !sharedImagePath) {
+      imageErrors.push(
+        `${entry.name} has no image and shared-product is missing`,
+      );
     }
 
     fixtures.push({
       key: entry.name,
       ...definition,
-      imagePaths,
+      imagePaths: imagePaths.length
+        ? imagePaths
+        : sharedImagePath
+          ? [sharedImagePath]
+          : [],
     });
   }
 
-  if (requireImages && missingImages.length) {
-    throw new Error(
-      `Every product directory needs exactly four images. Check: ${missingImages.join(', ')}`,
-    );
+  if (requireImages && imageErrors.length) {
+    throw new Error(`Product images are invalid: ${imageErrors.join(', ')}`);
   }
 
   return fixtures;
@@ -515,7 +535,7 @@ async function main(): Promise<void> {
   console.log(
     `Seeding ${config.sellers + config.customers + 1} users, ${expectedStores} stores, ` +
       `${expectedStores * productFixtures.length} products, and ` +
-      `${expectedStores * productFixtures.length * 4} unique Cloudinary images.`,
+      `${expectedStores * productFixtures.length} unique Cloudinary images.`,
   );
 
   await assertSeedDoesNotExist(db);

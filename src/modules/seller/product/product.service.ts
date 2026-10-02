@@ -87,9 +87,9 @@ export class ProductService {
     const images = dto.images;
     const status = dto.status ?? 'draft';
 
-    if (images.length < 4) {
+    if (images.length < 1) {
       throw new BadRequestException(
-        'At least 4 images are required to create a product',
+        'At least 1 image is required to create a product',
         'PRODUCT_IMAGES_REQUIRED',
       );
     }
@@ -144,9 +144,9 @@ export class ProductService {
     const nextImages = dto.images ?? product.images;
     const nextStatus = dto.status ?? product.status;
 
-    if (nextStatus === 'active' && nextImages.length < 4) {
+    if (nextStatus === 'active' && nextImages.length < 1) {
       throw new BadRequestException(
-        'At least 4 images are required to activate a product',
+        'At least 1 image is required to activate a product',
         'PRODUCT_IMAGES_REQUIRED',
       );
     }

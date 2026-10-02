@@ -49,6 +49,6 @@ export class CreateProductDto {
 
   // Populated by ProductImageUploadInterceptor after Cloudinary upload.
   @IsArray()
-  @ArrayMinSize(4, { message: 'At least 4 images are required' })
+  @ArrayMinSize(1, { message: 'At least 1 image is required' })
   images: ProductImage[];
 }

@@ -40,21 +40,21 @@ describe('ProductService', () => {
     });
   });
 
-  it('rejects product creation with fewer than four images', async () => {
+  it('rejects product creation without an image', async () => {
     await expect(
       service.createProduct('20243823-e478-46ab-a612-09f2c116b11e', {
         storeId: '9bea2767-f526-4ec4-9c67-1c65ccf6fba2',
         name: 'Wireless Headphones',
         price: 129.99,
-        images: images(3),
+        images: images(0),
       }),
-    ).rejects.toThrow('At least 4 images are required to create a product');
+    ).rejects.toThrow('At least 1 image is required to create a product');
 
     expect(createProduct).not.toHaveBeenCalled();
   });
 
-  it('creates a draft product when four images are provided', async () => {
-    const productImages = images(4);
+  it('creates a draft product when one image is provided', async () => {
+    const productImages = images(1);
     createProduct.mockResolvedValue({
       id: 'd109f733-afdd-4e82-bbc4-42d8336af198',
       storeId: '9bea2767-f526-4ec4-9c67-1c65ccf6fba2',
@@ -90,7 +90,7 @@ describe('ProductService', () => {
       description: null,
       price: '129.99',
       stock: 10,
-      images: images(4),
+      images: images(1),
       status: 'draft' as const,
       createdAt: new Date(),
       updatedAt: new Date(),
