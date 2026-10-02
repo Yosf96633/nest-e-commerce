@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, ForbiddenException, UnauthorizedException, Inject } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import type { Request } from "express";
+import type { AuthenticatedRequest } from '@/common/types/authenticated-request.type';
 import { ROLE_READER, type IRoleReader } from '../interfaces/role-reader.interface';
 import { Role } from '../types/role.type';
 
@@ -14,7 +14,7 @@ export class RoleGuard implements CanActivate {
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
 
-        const request = context.switchToHttp().getRequest<Request>();
+        const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
         const userID = request.user?.sub;
 
         if (!userID) {
