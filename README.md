@@ -1,26 +1,31 @@
 # E-Commerce API
 
-A REST API for an e-commerce platform built with NestJS, TypeScript, PostgreSQL, and Drizzle ORM. It provides authentication, email verification, seller applications, role-based access control, store management, product management, and Cloudinary-backed image uploads.
+A NestJS REST API for account and authentication flows, seller applications,
+store management, and product management. PostgreSQL stores application data;
+Cloudinary stores uploaded images; Resend sends email-verification messages.
 
-## Tech stack
+This repository currently covers the backend foundation and seller workflows.
+It does not yet implement customer catalog browsing, carts, checkout, orders,
+addresses, wishlists, reviews, or product pagination/filter/sort endpoints.
+
+## Stack
 
 - NestJS 11 and TypeScript
-- PostgreSQL (Neon serverless driver)
-- Drizzle ORM and Drizzle Kit
-- JWT access and refresh tokens
-- class-validator and class-transformer
-- Resend for verification emails
-- Cloudinary for store and product images
-- Jest for unit and end-to-end tests
+- PostgreSQL through Neon Serverless and Drizzle ORM
+- JWT access tokens and rotating refresh tokens
+- class-validator and class-transformer request validation
+- Resend verification email delivery
+- Cloudinary image storage
+- Jest unit and end-to-end test setup
 
 ## Requirements
 
 - Node.js 20 or newer
 - pnpm
-- A PostgreSQL database
-- Resend and Cloudinary accounts for email and image features
+- PostgreSQL/Neon database
+- Resend and Cloudinary credentials for email and image operations
 
-## Getting started
+## Setup
 
 Install dependencies:
 
@@ -28,7 +33,7 @@ Install dependencies:
 pnpm install
 ```
 
-Create a `.env` file in the project root:
+Create `.env` at the project root:
 
 ```dotenv
 NODE_ENV=development
@@ -36,8 +41,8 @@ PORT=3000
 
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 
-JWT_SECRET=replace-with-a-secure-secret
-REFRESH_TOKEN_SECRET=replace-with-another-secure-secret
+JWT_SECRET=replace-with-a-secure-access-token-secret
+REFRESH_TOKEN_SECRET=replace-with-a-secure-refresh-token-secret
 REFRESH_TOKEN_EXPIRATION_TIME=7d
 EMAIL_VERIFICATION_TOKEN_URL=http://localhost:3000/verify-email
 
@@ -48,21 +53,17 @@ CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-Apply the existing database migrations:
+Apply database migrations and start the server:
 
 ```bash
 pnpm db:migrate
-```
-
-Start the development server:
-
-```bash
 pnpm start:dev
 ```
 
-The API listens on `http://localhost:3000` by default.
+The server listens on `http://localhost:3000` by default. `PORT` can change
+that port. The global validation pipe transforms incoming DTO values.
 
-## Available commands
+## Commands
 
 | Command | Description |
 | --- | --- |
@@ -79,80 +80,173 @@ The API listens on `http://localhost:3000` by default.
 | `pnpm db:migrate` | Apply database migrations |
 | `pnpm db:push` | Push the schema directly to the database |
 | `pnpm db:studio` | Open Drizzle Studio |
+| `pnpm db:seed:check-metadata` | Validate local product JSON definitions |
+| `pnpm db:seed:check` | Validate product definitions and image files |
+| `pnpm db:seed` | Create development seed users, stores, products, and Cloudinary images |
+| `pnpm db:seed:cleanup` | Remove seed records and seed Cloudinary assets |
 
-## API overview
+### Development seed
 
-Routes that require authentication expect a bearer access token:
+The seed catalog is in `src/infrastructure/database/seeds/product-images/`.
+Each product directory has a `product.json` definition. The ignored
+`shared-product.png` image is used by default; a product may instead have its
+own `product.png`. The seeder uploads an image to Cloudinary for each product
+record and stores the returned URL and public ID in the product's image JSONB
+field.
+
+Defaults create one admin, two sellers, 20 customers, three stores, and 20
+distinct products per store. Seed accounts use `SeedUser123!` unless
+`SEED_USER_PASSWORD` is set. Optional sizing settings include:
+
+```dotenv
+SEED_SELLERS=2
+SEED_CUSTOMERS=20
+SEED_MAX_STORES_PER_SELLER=2
+SEED_UPLOAD_CONCURRENCY=4
+SEED_USER_PASSWORD=SeedUser123!
+```
+
+The seeder refuses to run with `NODE_ENV=production`. Cleanup targets the
+reserved `seed.local` account domain and the `e-com/seeds/realistic-v1/`
+Cloudinary prefix. See
+[`src/infrastructure/database/seeds/README.md`](src/infrastructure/database/seeds/README.md)
+for the seed layout and additional details.
+
+## Authentication and authorization
+
+Protected routes expect an access token:
 
 ```http
 Authorization: Bearer <access-token>
 ```
 
-The refresh token can be supplied through the `refresh_token` cookie or in the request body.
+The refresh token is set as an HTTP-only `refresh_token` cookie scoped to
+`/auth`. Refresh/logout also accept a `refreshToken` in the body for clients
+that cannot use cookies. Refresh tokens are hashed in the database and rotated
+when refreshed. Roles are `customer`, `seller`, `rider`, and `admin`.
 
-### Authentication
+New users receive the `customer` role after email verification. Seller/rider
+access is requested through an application and requires admin review. The JWT
+guard validates the access token; the role guard checks route role metadata
+against the database.
 
-| Method | Route | Description |
-| --- | --- | --- |
-| `POST` | `/auth/signup` | Register a user and send a verification email |
-| `POST` | `/auth/verify-email` | Verify an email using `token` and `userId` query parameters |
-| `POST` | `/auth/login` | Sign in and issue access and refresh tokens |
-| `POST` | `/auth/refresh` | Rotate a refresh token |
-| `GET` | `/auth/protected` | Test an authenticated request |
-| `POST` | `/auth/logout` | Revoke the refresh token |
+## API endpoints
 
-### Applications and administration
+### Authentication — `/auth`
 
-| Method | Route | Access | Description |
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| `POST` | `/application/create` | Authenticated | Apply for the `seller` or `rider` role |
-| `GET` | `/admin/applications` | Admin | List submitted applications |
-| `PATCH` | `/admin/approve-applications/:id` | Admin | Approve an application |
-| `PATCH` | `/admin/reject-applications/:id` | Admin | Reject an application |
+| `POST` | `/auth/signup` | Public | Register and send an email-verification message |
+| `POST` | `/auth/verify-email?token=…&userId=…` | Public | Verify email and assign the customer role |
+| `POST` | `/auth/login` | Public | Sign in, return an access token, and set refresh cookie |
+| `POST` | `/auth/refresh` | Refresh token | Rotate refresh token and issue a new access token |
+| `POST` | `/auth/logout` | Refresh token | Revoke the current refresh token and clear its cookie |
+| `GET` | `/auth/protected` | Authenticated | Example protected endpoint returning current user data |
 
-### Stores
+### Account management — `/users`
 
-| Method | Route | Access | Description |
+All account endpoints require an access token. The profile update accepts
+JSON fields and optionally a multipart `profileImage` file.
+
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| `POST` | `/store` | Seller | Create a store |
-| `GET` | `/store/my-stores` | Seller | List the current seller's stores |
-| `GET` | `/store/seller/:sellerId` | Authenticated | List stores for a seller |
-| `GET` | `/store/id/:id` | Authenticated | Get a store by ID |
+| `GET` | `/users/me` | Authenticated | Get the signed-in user's profile and roles |
+| `PATCH` | `/users/me` | Authenticated | Update profile fields and optionally upload a profile image |
+| `PATCH` | `/users/profile` | Authenticated | Compatibility alias for profile update |
+| `DELETE` | `/users/me/profile-image` | Authenticated | Remove the profile image |
+| `PATCH` | `/users/me/password` | Authenticated | Change password and revoke refresh-token sessions |
+| `GET` | `/users/me/sessions` | Authenticated | List active sessions and device metadata |
+| `DELETE` | `/users/me/sessions/:id` | Authenticated | Revoke one of the user's sessions |
+| `DELETE` | `/users/me/sessions` | Authenticated | Revoke all sessions and clear refresh cookie |
+| `DELETE` | `/users/me` | Authenticated | Delete account after password confirmation |
+| `GET` | `/users` | Admin | List users with their roles |
+| `GET` | `/users/:id` | Admin | Get a user and roles by UUID |
+
+Password change body:
+
+```json
+{
+  "currentPassword": "CurrentPass123!",
+  "newPassword": "NewPass456!"
+}
+```
+
+Account deletion body:
+
+```json
+{
+  "password": "CurrentPass123!"
+}
+```
+
+Account deletion cascades through owned database records and attempts to remove
+the account's profile, store, and product images from Cloudinary.
+
+### Seller applications and administration
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/application/create` | Authenticated | Submit a `seller` or `rider` application |
+| `GET` | `/admin/applications?status=pending` | Admin | List applications, optionally filtered by status |
+| `PATCH` | `/admin/approve-applications/:id` | Admin | Review/update an application; approved applicants receive the seller role |
+| `PATCH` | `/admin/reject-applications/:id` | Admin | Reject an application and optionally provide a reason |
+
+### Stores — `/store`
+
+Every store route currently requires authentication. Creation, update, and
+deletion additionally require the seller role and verify ownership.
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `POST` | `/store` | Seller | Create a store owned by the signed-in seller |
+| `GET` | `/store/my-stores` | Seller | List the signed-in seller's stores |
+| `GET` | `/store/seller/:sellerId` | Authenticated | List stores belonging to the specified seller |
+| `GET` | `/store/id/:id` | Authenticated | Get a store by UUID |
 | `GET` | `/store/:slug` | Authenticated | Get a store by slug |
-| `PATCH` | `/store/:id` | Seller | Update a store |
-| `DELETE` | `/store/:id` | Seller | Delete a store |
+| `PATCH` | `/store/:id` | Seller, owner | Update an owned store |
+| `DELETE` | `/store/:id` | Seller, owner | Delete an owned store |
 
-Store create and update requests accept `multipart/form-data` image fields named `profileImage` and `coverImage`. Each image may be up to 5 MB and must be JPG, JPEG, PNG, or WebP.
+Store create/update accepts `multipart/form-data` fields `profileImage` and
+`coverImage` (one file each, maximum 5 MB per file; JPG, JPEG, PNG, or WebP).
 
-### Products
+### Products — `/product`
 
-| Method | Route | Access | Description |
+Every product route currently requires authentication. Product routes also
+require the seller role; operations on a specific product verify that its
+store belongs to the signed-in seller. Product reads are not public catalog
+routes yet.
+
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| `POST` | `/product` | Seller | Create a product |
-| `GET` | `/product/my-products` | Seller | List the current seller's products |
-| `GET` | `/product/id/:id` | Seller | Get a product by ID |
-| `GET` | `/product/slug/:slug` | Seller | Get a product by slug |
-| `PATCH` | `/product/:id` | Seller | Update a product |
-| `DELETE` | `/product/:id` | Seller | Delete a product |
+| `POST` | `/product` | Seller | Create a product for an owned store |
+| `GET` | `/product/my-products` | Seller | List products across the seller's stores |
+| `GET` | `/product/:identifier` | Seller, owner | Get an owned product by UUID or slug |
+| `PATCH` | `/product/:id` | Seller, owner | Update an owned product |
+| `DELETE` | `/product/:id` | Seller, owner | Delete an owned product and its Cloudinary images |
 
-Product create and update requests accept up to 10 images in a `multipart/form-data` field named `images`. Each image may be up to 5 MB and must be JPG, JPEG, PNG, or WebP.
+Product create/update accepts `multipart/form-data` with up to 10 files in the
+`images` field. Creating and activating a product requires at least one image.
+Each file is limited to 5 MB and must be JPG, JPEG, PNG, or WebP.
 
-## Project structure
+## Repository layout
 
 ```text
 src/
-├── common/                  # Decorators, guards, and shared types
+├── common/                  # Current-user decorator, JWT/role guards, shared types
 ├── infrastructure/
-│   ├── cloudinary/          # Image storage integration
-│   ├── database/            # Drizzle schema and repositories
-│   └── resend/              # Transactional email integration
+│   ├── cloudinary/          # Image upload/delete integration
+│   ├── database/            # Neon Drizzle client, schema, repositories, seed script
+│   └── resend/              # Verification email integration
 └── modules/
-    ├── admin/               # Application review endpoints
-    ├── application/         # Seller and rider applications
-    ├── auth/                # Authentication and email verification
+    ├── admin/               # Application review
+    ├── application/         # Seller/rider applications
+    ├── auth/                # Signup, verification, login, token rotation, logout
     ├── seller/              # Store and product management
-    └── users/               # User domain and persistence
+    └── users/               # Profile, sessions, and account management
 ```
+
+See [`architecture.md`](architecture.md) for module boundaries, request flows,
+and data relationships.
 
 ## License
 
