@@ -4,9 +4,9 @@ A NestJS REST API for account and authentication flows, seller applications,
 store management, and product management. PostgreSQL stores application data;
 Cloudinary stores uploaded images; Resend sends email-verification messages.
 
-This repository currently covers the backend foundation and seller workflows.
-It does not yet implement customer catalog browsing, carts, checkout, orders,
-addresses, wishlists, reviews, or product pagination/filter/sort endpoints.
+This repository currently covers the backend foundation, seller workflows,
+public product catalog browsing, and persistent shopping carts. Checkout,
+orders, addresses, wishlists, and reviews are not implemented yet.
 
 ## Stack
 
@@ -227,6 +227,39 @@ routes yet.
 Product create/update accepts `multipart/form-data` with up to 10 files in the
 `images` field. Creating and activating a product requires at least one image.
 Each file is limited to 5 MB and must be JPG, JPEG, PNG, or WebP.
+
+### Public catalog — `/catalog`
+
+These routes are public and only return products and stores with `active`
+status. Product lists support `page`, `limit` (maximum 100), `q` name/description
+search, `minPrice`, `maxPrice`, `store` (store slug), `sortBy` (`createdAt`,
+`price`, or `name`), and `order` (`asc` or `desc`).
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/catalog/products` | Paginated catalog with optional search, price range, store, and sorting filters |
+| `GET` | `/catalog/products/:identifier` | Get an active product by UUID or slug, including basic store details |
+| `GET` | `/catalog/stores/:storeSlug/products` | Paginated active products for a store |
+
+List responses contain `data` and `pagination` (`page`, `limit`, `total`,
+`totalPages`).
+
+### Shopping cart — `/cart`
+
+Cart routes require an access token. Cart contents are stored per user in
+PostgreSQL; adding a product increments its existing quantity. Only products
+in active stores with active status can be added, and requested quantities
+must not exceed current stock. Prices and line totals in cart responses use
+the current product price; checkout-time price/stock verification will still
+be required when checkout is implemented.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/cart` | Get cart items, item count, and subtotal |
+| `POST` | `/cart/items` | Add quantity of a product; body: `{"productId":"<uuid>","quantity":2}` |
+| `PATCH` | `/cart/items/:productId` | Set the item's quantity; body: `{"quantity":3}` |
+| `DELETE` | `/cart/items/:productId` | Remove a product from the cart |
+| `DELETE` | `/cart` | Clear the cart |
 
 ## Repository layout
 

@@ -12,6 +12,8 @@ flowchart LR
     API[NestJS application]
     Auth[Auth and account modules]
     Seller[Seller, store, and product modules]
+    Catalog[Public catalog module]
+    Cart[Shopping cart module]
     Admin[Application and admin modules]
     DB[(PostgreSQL on Neon)]
     Cloudinary[Cloudinary]
@@ -20,9 +22,13 @@ flowchart LR
     Client --> API
     API --> Auth
     API --> Seller
+    API --> Catalog
+    API --> Cart
     API --> Admin
     Auth --> DB
     Seller --> DB
+    Catalog --> DB
+    Cart --> DB
     Admin --> DB
     Auth --> Cloudinary
     Seller --> Cloudinary
@@ -66,6 +72,8 @@ flowchart TD
 | `admin` | Review applications and grant the seller role when approved |
 | `seller/store` | Create and manage stores and their Cloudinary images |
 | `seller/product` | Create and manage products, inventory fields, and product images |
+| `catalog` | Public active-product listing/details with search, price filtering, pagination, and sorting |
+| `cart` | Per-user persistent cart items with stock checks and computed totals |
 | `infrastructure/database` | Drizzle schemas and implementations of persistence interfaces |
 | `infrastructure/cloudinary` | Upload and delete image assets |
 | `infrastructure/resend` | Send email-verification messages |
@@ -135,6 +143,11 @@ Store operations that modify data verify the signed-in seller owns the store.
 Product operations resolve the product's store and verify that store belongs
 to the signed-in seller. Store deletion cascades to products in PostgreSQL.
 
+Public catalog queries include only active products in active stores. Cart
+items reference both user and product and cascade on account/product deletion.
+Cart responses calculate line totals and subtotal from the current product
+price; checkout must revalidate price and stock.
+
 ## Persistence model
 
 ```mermaid
@@ -146,6 +159,8 @@ erDiagram
     USERS ||--o{ STORES : owns
     STORES ||--o{ PRODUCTS : contains
     USERS ||--o{ APPLICATIONS : reviews
+    USERS ||--o{ CART_ITEMS : has
+    PRODUCTS ||--o{ CART_ITEMS : selected_in
 
     USERS {
         uuid id PK
@@ -187,6 +202,12 @@ erDiagram
         jsonb images
         string status
     }
+    CART_ITEMS {
+        uuid user_id PK, FK
+        uuid product_id PK, FK
+        integer quantity
+        timestamp updated_at
+    }
 ```
 
 Product image files live in Cloudinary. The product row stores a JSONB array of
@@ -219,7 +240,7 @@ README.
 ## Current scope and next layers
 
 Implemented functionality covers authentication, account management, seller
-applications and review, stores, and seller-managed products. Routes for
-customer-facing public catalog browsing, pagination, filtering, sorting, carts,
-checkout, orders, delivery addresses, wishlists, and product reviews are not
-present in the current codebase.
+applications and review, stores, seller-managed products, public product
+catalog browsing, and persistent shopping carts. Checkout, orders, delivery
+addresses, wishlists, and product reviews are not present in the current
+codebase.

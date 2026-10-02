@@ -9,6 +9,8 @@ import { ResendModule } from './infrastructure/resend/resend.module';
 import { ApplicationModule } from './modules/application/application.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SellerModule } from './modules/seller/seller.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { CartModule } from './modules/cart/cart.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { SellerModule } from './modules/seller/seller.module';
     ApplicationModule,
     AdminModule,
     SellerModule,
+    CatalogModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
