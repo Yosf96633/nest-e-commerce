@@ -1,0 +1,7 @@
+{
+  "name": "PulseBand Fitness Tracker",
+  "description": "A slim fitness tracker with a color display, heart-rate monitoring, sleep tracking, and a silicone strap.",
+  "price": 49.99,
+  "stock": 0,
+  "status": "active"
+}

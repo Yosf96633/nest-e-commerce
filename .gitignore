@@ -52,5 +52,11 @@ pids
 *.seed
 *.pid.lock
 
+# Locally generated seed product images (keep product.json and PROMPTS.md)
+/src/infrastructure/database/seeds/product-images/**/*.png
+/src/infrastructure/database/seeds/product-images/**/*.jpg
+/src/infrastructure/database/seeds/product-images/**/*.jpeg
+/src/infrastructure/database/seeds/product-images/**/*.webp
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
