@@ -30,6 +30,7 @@ export interface UpdateUserData {
   phoneNumber?: string | null;
   profileImage?: string | null;
   profileImagePublicId?: string | null;
+  passwordHash?: string;
 }
 
 export type UserProfile = Omit<User, 'passwordHash' | 'profileImagePublicId'>;

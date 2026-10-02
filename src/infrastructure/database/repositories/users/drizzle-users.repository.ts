@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { DatabaseService } from '../../database.service';
-import { users, userRoles, refreshTokens } from '../../schema';
+import {
+  users,
+  userRoles,
+  refreshTokens,
+  stores,
+  products,
+} from '../../schema';
 import { IUsersRepository } from '../../../../modules/users/interfaces/users-repository.interface';
 import {
   CreateUserData,
@@ -94,6 +100,42 @@ export class DrizzleUsersRepository implements IUsersRepository {
     await this.db.client.delete(users).where(eq(users.id, userId));
   }
 
+  async findCloudinaryPublicIdsForUser(userId: string): Promise<string[]> {
+    const [userRecords, ownedStores] = await Promise.all([
+      this.db.client
+        .select({ publicId: users.profileImagePublicId })
+        .from(users)
+        .where(eq(users.id, userId)),
+      this.db.client
+        .select({
+          id: stores.id,
+          profileImagePublicId: stores.profileImagePublicId,
+          coverImagePublicId: stores.coverImagePublicId,
+        })
+        .from(stores)
+        .where(eq(stores.sellerId, userId)),
+    ]);
+
+    const storeIds = ownedStores.map((store) => store.id);
+    const ownedProducts = storeIds.length
+      ? await this.db.client
+          .select({ images: products.images })
+          .from(products)
+          .where(inArray(products.storeId, storeIds))
+      : [];
+
+    return [
+      userRecords[0]?.publicId,
+      ...ownedStores.flatMap((store) => [
+        store.profileImagePublicId,
+        store.coverImagePublicId,
+      ]),
+      ...ownedProducts.flatMap((product) =>
+        product.images.map((image) => image.publicId),
+      ),
+    ].filter((publicId): publicId is string => Boolean(publicId));
+  }
+
   async markEmailVerified(userId: string): Promise<void> {
     await this.db.client
       .update(users)
@@ -120,10 +162,17 @@ export class DrizzleUsersRepository implements IUsersRepository {
     userId: string,
     refreshToken: string,
     expiresAt: Date,
+    metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<RefreshToken> {
     const result = await this.db.client
       .insert(refreshTokens)
-      .values({ userId, tokenHash: refreshToken, expiresAt })
+      .values({
+        userId,
+        tokenHash: refreshToken,
+        expiresAt,
+        userAgent: metadata?.userAgent,
+        ipAddress: metadata?.ipAddress,
+      })
       .returning();
     return this.toRefreshToken(result[0]);
   }
@@ -145,16 +194,36 @@ export class DrizzleUsersRepository implements IUsersRepository {
   }
 
   async revokeRefreshToken(
+    userId: string,
     tokenId: string,
     replacedByTokenId?: string,
-  ): Promise<void> {
-    await this.db.client
+  ): Promise<boolean> {
+    const result = await this.db.client
       .update(refreshTokens)
       .set({
         revokedAt: new Date(),
         replacedBy: replacedByTokenId ?? null,
       })
-      .where(eq(refreshTokens.id, tokenId));
+      .where(
+        and(
+          eq(refreshTokens.id, tokenId),
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+        ),
+      )
+      .returning({ id: refreshTokens.id });
+    return result.length > 0;
+  }
+
+  async revokeAllRefreshTokens(userId: string): Promise<number> {
+    const result = await this.db.client
+      .update(refreshTokens)
+      .set({ revokedAt: new Date() })
+      .where(
+        and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)),
+      )
+      .returning({ id: refreshTokens.id });
+    return result.length;
   }
 
   private toUser(record: typeof users.$inferSelect): User {

@@ -15,6 +15,7 @@ export interface IUsersRepository {
   create(data: CreateUserData): Promise<User>;
   update(userId: string, data: UpdateUserData): Promise<User>;
   delete(userId: string): Promise<void>;
+  findCloudinaryPublicIdsForUser(userId: string): Promise<string[]>;
   markEmailVerified(userId: string): Promise<void>;
   getRoles(userId: string): Promise<Role[]>;
   assignRole(userId: string, role: Role): Promise<void>;
@@ -22,12 +23,15 @@ export interface IUsersRepository {
     userId: string,
     refreshToken: string,
     expiresAt: Date,
+    metadata?: { userAgent?: string; ipAddress?: string },
   ): Promise<RefreshToken>;
   findActiveRefreshTokensByUserId(userId: string): Promise<RefreshToken[]>;
   revokeRefreshToken(
+    userId: string,
     tokenId: string,
     replacedByTokenId?: string,
-  ): Promise<void>;
+  ): Promise<boolean>;
+  revokeAllRefreshTokens(userId: string): Promise<number>;
 }
 
 export const USERS_REPOSITORY = Symbol('IUsersRepository');
