@@ -14,6 +14,7 @@ flowchart LR
     Seller[Seller, store, and product modules]
     Catalog[Public catalog module]
     Cart[Shopping cart module]
+    Reviews[Product reviews module]
     Admin[Application and admin modules]
     DB[(PostgreSQL on Neon)]
     Cloudinary[Cloudinary]
@@ -24,11 +25,13 @@ flowchart LR
     API --> Seller
     API --> Catalog
     API --> Cart
+    API --> Reviews
     API --> Admin
     Auth --> DB
     Seller --> DB
     Catalog --> DB
     Cart --> DB
+    Reviews --> DB
     Admin --> DB
     Auth --> Cloudinary
     Seller --> Cloudinary
@@ -38,8 +41,9 @@ flowchart LR
 ## Application composition
 
 `AppModule` loads environment configuration and composes the database, auth,
-Cloudinary, Resend, application, admin, and seller modules. `DatabaseModule` is
-global and provides the Neon-backed Drizzle client and role reader.
+Cloudinary, Resend, application, admin, seller, catalog, cart, and reviews
+modules. `DatabaseModule` is global and provides the Neon-backed Drizzle client
+and role reader.
 
 At startup, `main.ts` installs cookie parsing and a global `ValidationPipe`
 with transformation enabled. Controllers bind HTTP routes and DTOs; services
@@ -63,23 +67,57 @@ flowchart TD
 
 ## Modules and responsibilities
 
-| Area | Responsibility |
-| --- | --- |
-| `common` | Current-user decorator, JWT and role guards, shared role and JWT types |
-| `auth` | Signup, email verification, login, refresh-token rotation, logout |
-| `users` | Own profile, password, sessions, account deletion, and admin user lookups |
-| `application` | Submit a request for seller or rider access |
-| `admin` | Review applications and grant the seller role when approved |
-| `seller/store` | Create and manage stores and their Cloudinary images |
-| `seller/product` | Create and manage products, inventory fields, and product images |
-| `catalog` | Public active-product listing/details with search, price filtering, pagination, and sorting |
-| `cart` | Per-user persistent cart items with stock checks and computed totals |
-| `infrastructure/database` | Drizzle schemas and implementations of persistence interfaces |
-| `infrastructure/cloudinary` | Upload and delete image assets |
-| `infrastructure/resend` | Send email-verification messages |
+| Area                        | Responsibility                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `common`                    | Current-user decorator, JWT and role guards, shared role and JWT types                      |
+| `auth`                      | Signup, email verification, login, refresh-token rotation, logout                           |
+| `users`                     | Own profile, password, sessions, account deletion, and admin user lookups                   |
+| `application`               | Submit a request for seller or rider access                                                 |
+| `admin`                     | Review applications and grant the seller role when approved                                 |
+| `seller/store`              | Create and manage stores and their Cloudinary images                                        |
+| `seller/product`            | Create and manage products, inventory fields, and product images                            |
+| `catalog`                   | Public active-product listing/details with search, price filtering, pagination, and sorting |
+| `cart`                      | Per-user persistent cart items with stock checks and computed totals                        |
+| `reviews`                   | Public product review lists and summaries; authenticated owner-controlled review mutations  |
+| `infrastructure/database`   | Drizzle schemas and implementations of persistence interfaces                               |
+| `infrastructure/cloudinary` | Upload and delete image assets                                                              |
+| `infrastructure/resend`     | Send email-verification messages                                                            |
 
 `SellerController` is currently an empty placeholder. Store and product routes
 are implemented in their respective controllers.
+
+## Service and repository boundaries
+
+Feature services own business behavior and depend on interfaces rather than
+Drizzle or `DatabaseService`. Repository interfaces and domain entities live in
+the feature module. Concrete database implementations live in infrastructure
+and are bound to their interface tokens by Nest modules.
+
+```text
+Controller
+  → Service (business rules and response shaping)
+    → Repository interface (feature-owned port)
+      → Drizzle repository (infrastructure adapter)
+        → DatabaseService
+          → Neon PostgreSQL
+```
+
+| Feature                  | Service dependency                  | Drizzle implementation         |
+| ------------------------ | ----------------------------------- | ------------------------------ |
+| Users                    | `IUsersRepository`                  | `DrizzleUsersRepository`       |
+| Auth verification tokens | `IEmailVerificationTokenRepository` | `DrizzleEmailVeriRepository`   |
+| Applications/Admin       | `IApplicationRepository`            | `DrizzleApplicationRepository` |
+| Stores                   | `IStoreRepository`                  | `DrizzleStoreRepository`       |
+| Products                 | `IProductRepository`                | `DrizzleProductRepository`     |
+| Catalog                  | `ICatalogRepository`                | `DrizzleCatalogRepository`     |
+| Cart                     | `ICartRepository`                   | `DrizzleCartRepository`        |
+| Reviews                  | `IReviewRepository`                 | `DrizzleReviewRepository`      |
+
+Auth accesses user persistence through its `IAuthUsers` port, backed by the
+users service. Admin orchestrates the application repository and users service
+instead of owning duplicate persistence adapters. The empty seller service has
+no persistence dependency. No feature service imports Drizzle schemas or the
+database service directly.
 
 ## Authentication and authorization flow
 
@@ -148,6 +186,14 @@ items reference both user and product and cascade on account/product deletion.
 Cart responses calculate line totals and subtotal from the current product
 price; checkout must revalidate price and stock.
 
+Reviews reference both their author and product. The database permits only one
+review per `(product_id, user_id)` pair and constrains ratings to 1–5. Creating
+a review requires an authenticated user and an active product in an active
+store. Review updates and deletion include the authenticated user ID in the
+repository condition, so only the author can mutate the row. Public product
+review queries provide pagination, rating filtering, sorting, average rating,
+and a star-count distribution.
+
 ## Persistence model
 
 ```mermaid
@@ -161,6 +207,8 @@ erDiagram
     USERS ||--o{ APPLICATIONS : reviews
     USERS ||--o{ CART_ITEMS : has
     PRODUCTS ||--o{ CART_ITEMS : selected_in
+    USERS ||--o{ REVIEWS : writes
+    PRODUCTS ||--o{ REVIEWS : receives
 
     USERS {
         uuid id PK
@@ -208,7 +256,20 @@ erDiagram
         integer quantity
         timestamp updated_at
     }
+    REVIEWS {
+        uuid id PK
+        uuid product_id FK
+        uuid user_id FK
+        integer rating
+        string title
+        text comment
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
+
+`REVIEWS` has a unique `(product_id, user_id)` index, a database check requiring
+ratings from 1 through 5, and cascading foreign keys to users and products.
 
 Product image files live in Cloudinary. The product row stores a JSONB array of
 image metadata (`url`, `publicId`, and `displayOrder`). Store and profile image
@@ -237,10 +298,16 @@ copy for each product record. A product-specific `product.png` can override the
 shared image. Seed validation and cleanup commands are documented in the seed
 README.
 
+The separate `reviews.seed.ts` script runs after the review migration and main
+seed. It fetches seeded product and customer IDs from PostgreSQL, creates three
+reviews per product, and uses conflict handling so it can be rerun safely.
+`customer01@seed.local` is assigned one review on every seeded product; the
+remaining authors rotate through the other seeded customers.
+
 ## Current scope and next layers
 
 Implemented functionality covers authentication, account management, seller
 applications and review, stores, seller-managed products, public product
-catalog browsing, and persistent shopping carts. Checkout, orders, delivery
-addresses, wishlists, and product reviews are not present in the current
+catalog browsing, persistent shopping carts, and product reviews. Checkout,
+orders, delivery addresses, and wishlists are not present in the current
 codebase.
