@@ -6,3 +6,4 @@ export * from './application.schema';
 export * from './store.schema';
 export * from './product.schema';
 export * from './cart.schema';
+export * from './review.schema';

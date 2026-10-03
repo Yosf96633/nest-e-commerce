@@ -23,6 +23,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "node --env-file=.env -r ts-node/register -r tsconfig-paths/register src/infrastructure/database/seeds/realistic.seed.ts",
+    "db:seed:reviews": "node --env-file=.env -r ts-node/register -r tsconfig-paths/register src/infrastructure/database/seeds/reviews.seed.ts",
     "db:seed:check": "npm run db:seed -- --check",
     "db:seed:check-metadata": "npm run db:seed -- --check-metadata",
     "db:seed:cleanup": "npm run db:seed -- --cleanup"

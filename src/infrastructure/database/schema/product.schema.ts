@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql, relations } from 'drizzle-orm';
 import { stores } from './store.schema';
+import { reviews } from './review.schema';
 import {
   PRODUCT_STATUSES,
   type ProductImage,
@@ -98,12 +99,14 @@ export const products = pgTable(
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 
-export const productsRelations = relations(products, ({ one }) => ({
+export const productsRelations = relations(products, ({ one, many }) => ({
   /** The store that owns this product */
   store: one(stores, {
     fields: [products.storeId],
     references: [stores.id],
   }),
+  /** Customer reviews submitted for this product */
+  reviews: many(reviews),
 }));
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -36,6 +36,13 @@
       "when": 1790942161468,
       "tag": "0004_lean_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791010544798,
+      "tag": "0005_curvy_mentallo",
+      "breakpoints": true
     }
   ]
 }

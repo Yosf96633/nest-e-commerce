@@ -9,8 +9,8 @@ tables:
 - configurable products for every store;
 - one Cloudinary image for every product record.
 
-Reviews are not included yet because the project does not currently have a
-review schema. Add review records to this seed after that schema is introduced.
+Reviews have a separate, rerunnable seed so they can be added to an existing
+catalog after the review migration is applied.
 
 ## Add the source images
 
@@ -100,6 +100,22 @@ CLOUDINARY_API_SECRET
 ```
 
 The script refuses to run when `NODE_ENV=production`.
+
+## Seed product reviews
+
+After applying the database migrations and running the main seed, add reviews:
+
+```bash
+npm run db:migrate
+npm run db:seed:reviews
+```
+
+The review seed fetches the existing seeded product and customer IDs from the
+database. It creates up to three reviews per product and can safely be rerun;
+the `(product_id, user_id)` unique constraint prevents duplicate reviews.
+`customer01@seed.local` reviews every seeded product, providing a predictable
+account for testing user-specific review queries. The other review authors are
+rotated through the remaining seeded customers.
 
 ## Remove seed data
 

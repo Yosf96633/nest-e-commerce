@@ -14,6 +14,7 @@ import { emailVerificationTokens } from './email-verification-tokens.schema';
 import { userRoles } from './user-roles.schema';
 import { applications } from './application.schema';
 import { products } from './product.schema';
+import { reviews } from './review.schema';
 import {
   STORE_STATUSES,
   type StoreStatus as DomainStoreStatus,
@@ -106,6 +107,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   reviewedApplications: many(applications, { relationName: 'reviewer' }),
   /** Stores owned by this user as a seller */
   stores: many(stores),
+  /** Product reviews written by this user */
+  reviews: many(reviews),
 }));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
