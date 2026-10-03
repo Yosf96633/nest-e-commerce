@@ -11,6 +11,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { SellerModule } from './modules/seller/seller.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CartModule } from './modules/cart/cart.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 
 @Module({
   imports: [
@@ -24,8 +25,9 @@ import { CartModule } from './modules/cart/cart.module';
     SellerModule,
     CatalogModule,
     CartModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
