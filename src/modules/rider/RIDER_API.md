@@ -59,6 +59,7 @@ Content-Type: application/json
 }
 ```
 
-A rider profile must exist before availability can be changed. Delivery and
-order assignment are intentionally not part of this module yet because the
-project does not currently have an order domain.
+A rider profile must exist before availability can be changed. A rider with an
+`assigned` or `picked_up` order cannot manually become available. Checkout
+assigns an available rider automatically, and delivery or cancellation releases
+that rider.

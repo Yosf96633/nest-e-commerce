@@ -47,8 +47,8 @@ flowchart LR
 ## Application composition
 
 `AppModule` loads environment configuration and composes the database, auth,
-Cloudinary, Resend, application, admin, seller, catalog, cart, reviews, and
-rider, and orders modules. `DatabaseModule` is global and provides the
+Cloudinary, Resend, application, admin, seller, catalog, cart, reviews, rider,
+and orders modules. `DatabaseModule` is global and provides the
 transaction-capable Neon WebSocket Drizzle client and role reader.
 
 At startup, `main.ts` installs cookie parsing and a global `ValidationPipe`
@@ -207,8 +207,8 @@ and a star-count distribution.
 An approved rider can create one rider profile containing vehicle and document
 details. Plate and license identifiers are unique, and the service requires
 both for motor vehicles. Riders control their availability independently from
-profile edits. Delivery assignment is intentionally deferred until the order
-domain exists.
+profile edits. Checkout assigns available riders, and active orders prevent a
+rider from manually becoming available until delivery or cancellation.
 
 ## Checkout and rider assignment
 
@@ -363,14 +363,18 @@ definitions, creates users and roles, creates stores using returned seller IDs,
 then creates products using returned store IDs. By default it uses the single
 Git-ignored `shared-product.png` file and uploads one independent Cloudinary
 copy for each product record. A product-specific `product.png` can override the
-shared image. Seed validation and cleanup commands are documented in the seed
-README.
+shared image. Seed validation and cleanup commands are documented in
+[Seeding](seeding.md).
 
 The separate `reviews.seed.ts` script runs after the review migration and main
 seed. It fetches seeded product and customer IDs from PostgreSQL, creates three
 reviews per product, and uses conflict handling so it can be rerun safely.
 `customer01@seed.local` is assigned one review on every seeded product; the
 remaining authors rotate through the other seeded customers.
+
+The separate `riders-orders.seed.ts` script creates four rider profiles and
+four deterministic example orders covering each order status. It derives
+customer, product, and rider IDs from the database and is safe to rerun.
 
 ## Current scope and next layers
 
