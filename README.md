@@ -87,6 +87,7 @@ that port. The global validation pipe transforms incoming DTO values.
 | `pnpm db:seed:check`          | Validate product definitions and image files                           |
 | `pnpm db:seed`                | Create development seed users, stores, products, and Cloudinary images |
 | `pnpm db:seed:reviews`        | Add three user-linked reviews to every seeded product                  |
+| `pnpm db:seed:riders-orders`  | Add four riders and orders covering every order status                 |
 | `pnpm db:seed:cleanup`        | Remove seed records and seed Cloudinary assets                         |
 
 ### Development seed
@@ -127,6 +128,19 @@ database and creates three reviews per seeded product. It is idempotent:
 rerunning it does not create duplicate `(product_id, user_id)` records.
 `customer01@seed.local` reviews every seeded product, making it the predictable
 account for user-review testing.
+
+Seed four rider accounts and four example orders separately:
+
+```bash
+pnpm db:seed:riders-orders
+```
+
+This rerunnable seed creates `rider01@seed.local` through
+`rider04@seed.local`, assigns the `customer` and `rider` roles, and creates one
+order for each of the `assigned`, `picked_up`, `delivered`, and `cancelled`
+states. Each order contains two existing seeded products. Rider availability is
+kept consistent with the assigned order state. The default password is
+`SeedUser123!`.
 
 ## Authentication and authorization
 

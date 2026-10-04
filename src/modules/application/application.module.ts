@@ -6,7 +6,7 @@ import { APPLICATIONS_REPOSITORY } from './interfaces/application-repository.int
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [],
   controllers: [ApplicationController],
   providers: [
     ApplicationService,

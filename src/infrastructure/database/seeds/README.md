@@ -9,8 +9,8 @@ tables:
 - configurable products for every store;
 - one Cloudinary image for every product record.
 
-Reviews have a separate, rerunnable seed so they can be added to an existing
-catalog after the review migration is applied.
+Reviews and rider/order examples have separate, rerunnable seeds so they can be
+added to an existing catalog after their migrations are applied.
 
 ## Add the source images
 
@@ -116,6 +116,22 @@ the `(product_id, user_id)` unique constraint prevents duplicate reviews.
 `customer01@seed.local` reviews every seeded product, providing a predictable
 account for testing user-specific review queries. The other review authors are
 rotated through the remaining seeded customers.
+
+## Seed riders and orders
+
+After applying the rider and order migrations and running the main seed, run:
+
+```bash
+pnpm db:seed:riders-orders
+```
+
+This creates or updates four accounts (`rider01@seed.local` through
+`rider04@seed.local`) with both `customer` and `rider` roles and matching rider
+profiles. It also creates or updates four deterministic example orders—one in
+each of the `assigned`, `picked_up`, `delivered`, and `cancelled` states—with
+two existing seeded products per order. Active-order riders are unavailable;
+the delivered and cancelled-order riders are available. Rerunning the command
+updates the same riders and orders rather than duplicating them.
 
 ## Remove seed data
 
