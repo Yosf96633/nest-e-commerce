@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type {
   CreateRiderProfileData,
   RiderProfile,
@@ -7,7 +7,7 @@ import type {
 } from '@/modules/rider/entities/rider.entity';
 import { IRiderRepository } from '@/modules/rider/interfaces/rider.repository.interface';
 import { DatabaseService } from '../../database.service';
-import { riderProfiles } from '../../schema';
+import { orders, riderProfiles } from '../../schema';
 
 @Injectable()
 export class DrizzleRiderRepository implements IRiderRepository {
@@ -59,6 +59,22 @@ export class DrizzleRiderRepository implements IRiderRepository {
       .returning();
 
     return record ? this.toEntity(record) : undefined;
+  }
+
+  async hasActiveOrder(userId: string): Promise<boolean> {
+    const [record] = await this.db.client
+      .select({ id: orders.id })
+      .from(orders)
+      .innerJoin(riderProfiles, eq(orders.riderProfileId, riderProfiles.id))
+      .where(
+        and(
+          eq(riderProfiles.userId, userId),
+          inArray(orders.status, ['assigned', 'picked_up']),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(record);
   }
 
   private toEntity(record: typeof riderProfiles.$inferSelect): RiderProfile {

@@ -31,6 +31,7 @@ describe('RiderService', () => {
       create: jest.fn(),
       update: jest.fn(),
       updateAvailability: jest.fn(),
+      hasActiveOrder: jest.fn(),
     };
     service = new RiderService(repository);
   });
@@ -86,10 +87,20 @@ describe('RiderService', () => {
   });
 
   it('requires a profile before availability can be changed', async () => {
+    repository.hasActiveOrder.mockResolvedValue(false);
     repository.updateAvailability.mockResolvedValue(undefined);
 
     await expect(
       service.updateAvailability('user-id', true),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('does not allow a rider with an active order to become available', async () => {
+    repository.hasActiveOrder.mockResolvedValue(true);
+
+    await expect(
+      service.updateAvailability('user-id', true),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.updateAvailability).not.toHaveBeenCalled();
   });
 });

@@ -113,6 +113,12 @@ export class RiderService {
     userId: string,
     isAvailable: boolean,
   ): Promise<RiderProfile> {
+    if (isAvailable && (await this.riderRepository.hasActiveOrder(userId))) {
+      throw new ConflictException(
+        'A rider with an active order cannot become available',
+        'RIDER_HAS_ACTIVE_ORDER',
+      );
+    }
     const updated = await this.riderRepository.updateAvailability(
       userId,
       isAvailable,

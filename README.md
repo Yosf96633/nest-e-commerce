@@ -1,15 +1,15 @@
 # E-Commerce API
 
 A NestJS REST API for account and authentication flows, seller applications,
-store and product management, catalog browsing, shopping carts, product
-reviews, and rider profiles. PostgreSQL stores application data; Cloudinary
-stores uploaded images; Resend sends email-verification messages.
+store and product management, catalog browsing, shopping carts, orders,
+product reviews, and rider profiles. PostgreSQL stores application data;
+Cloudinary stores uploaded images; Resend sends email-verification messages.
 
 This repository currently covers the backend foundation, seller workflows,
 public product catalog browsing, persistent shopping carts, and user-owned
-product reviews. Approved riders can manage vehicle details and availability.
-Checkout, orders, delivery assignment, addresses, and wishlists are not
-implemented yet.
+product reviews. Approved riders manage vehicle details and availability, and
+checkout atomically assigns orders to available riders. Payment processing,
+live rider location, proximity dispatch, and wishlists are not implemented yet.
 
 ## Stack
 
@@ -195,8 +195,9 @@ Account deletion body:
 }
 ```
 
-Account deletion cascades through owned database records and attempts to remove
-the account's profile, store, and product images from Cloudinary.
+Account deletion cascades through disposable owned records and attempts to
+remove profile, store, and product images from Cloudinary. Historical orders
+are preserved with a null customer reference and their checkout-time snapshots.
 
 ### Seller/rider applications and administration
 
@@ -300,6 +301,29 @@ distribution, and pagination metadata. See
 [`src/modules/reviews/REVIEWS_API.md`](src/modules/reviews/REVIEWS_API.md) for
 request examples.
 
+### Orders — `/orders`
+
+Checkout converts the authenticated user's cart into immutable order and item
+snapshots. It validates active products and stock, reserves the longest-waiting
+available rider, decrements stock, and clears the cart in one database
+transaction. There is no `cartId`: the cart belongs to the user and remains
+mutable, while order records preserve checkout-time names, prices, images, and
+delivery address.
+
+| Method  | Endpoint                        | Access   | Description                                  |
+| ------- | ------------------------------- | -------- | -------------------------------------------- |
+| `POST`  | `/orders`                       | Customer | Checkout the current cart and assign a rider |
+| `GET`   | `/orders`                       | Customer | List the current customer's orders           |
+| `GET`   | `/orders/:orderId`              | Customer | Get one owned order                          |
+| `PATCH` | `/orders/:orderId/cancel`       | Customer | Cancel an order that has not been picked up  |
+| `GET`   | `/orders/rider/current`         | Rider    | List the rider's assigned/in-progress orders |
+| `PATCH` | `/orders/rider/:orderId/status` | Rider    | Move an order to `picked_up` or `delivered`  |
+
+Orders move through `assigned → picked_up → delivered`, or from `assigned` to
+`cancelled`. A delivered or cancelled order releases its rider. The demo uses
+a fixed `5.00` delivery fee and does not accept client-supplied prices. See
+[`src/modules/orders/ORDERS_API.md`](src/modules/orders/ORDERS_API.md).
+
 ### Rider profiles — `/rider`
 
 Rider routes require an access token and the `rider` role. Users receive this
@@ -336,6 +360,7 @@ src/
     ├── catalog/             # Public product discovery and filtering
     ├── reviews/             # Product reviews, summaries, and ownership rules
     ├── rider/               # Rider vehicle profiles and availability
+    ├── orders/              # Transactional checkout and rider fulfillment
     ├── seller/              # Store and product management
     └── users/               # Profile, sessions, and account management
 ```

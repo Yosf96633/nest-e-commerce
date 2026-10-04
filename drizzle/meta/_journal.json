@@ -50,6 +50,20 @@
       "when": 1791101310150,
       "tag": "0006_nice_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791104648777,
+      "tag": "0007_eager_raza",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791104814097,
+      "tag": "0008_thin_edwin_jarvis",
+      "breakpoints": true
     }
   ]
 }

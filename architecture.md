@@ -16,6 +16,7 @@ flowchart LR
     Cart[Shopping cart module]
     Reviews[Product reviews module]
     Rider[Rider profile module]
+    Orders[Orders and dispatch module]
     Admin[Application and admin modules]
     DB[(PostgreSQL on Neon)]
     Cloudinary[Cloudinary]
@@ -28,6 +29,7 @@ flowchart LR
     API --> Cart
     API --> Reviews
     API --> Rider
+    API --> Orders
     API --> Admin
     Auth --> DB
     Seller --> DB
@@ -35,6 +37,7 @@ flowchart LR
     Cart --> DB
     Reviews --> DB
     Rider --> DB
+    Orders --> DB
     Admin --> DB
     Auth --> Cloudinary
     Seller --> Cloudinary
@@ -45,8 +48,8 @@ flowchart LR
 
 `AppModule` loads environment configuration and composes the database, auth,
 Cloudinary, Resend, application, admin, seller, catalog, cart, reviews, and
-rider modules. `DatabaseModule` is global and provides the Neon-backed Drizzle
-client and role reader.
+rider, and orders modules. `DatabaseModule` is global and provides the
+transaction-capable Neon WebSocket Drizzle client and role reader.
 
 At startup, `main.ts` installs cookie parsing and a global `ValidationPipe`
 with transformation enabled. Controllers bind HTTP routes and DTOs; services
@@ -83,6 +86,7 @@ flowchart TD
 | `cart`                      | Per-user persistent cart items with stock checks and computed totals                        |
 | `reviews`                   | Public product review lists and summaries; authenticated owner-controlled review mutations  |
 | `rider`                     | Rider-owned vehicle profiles and availability                                               |
+| `orders`                    | Transactional checkout, stock updates, rider assignment, and fulfillment status             |
 | `infrastructure/database`   | Drizzle schemas and implementations of persistence interfaces                               |
 | `infrastructure/cloudinary` | Upload and delete image assets                                                              |
 | `infrastructure/resend`     | Send email-verification messages                                                            |
@@ -117,6 +121,7 @@ Controller
 | Cart                     | `ICartRepository`                   | `DrizzleCartRepository`        |
 | Reviews                  | `IReviewRepository`                 | `DrizzleReviewRepository`      |
 | Riders                   | `IRiderRepository`                  | `DrizzleRiderRepository`       |
+| Orders                   | `IOrderRepository`                  | `DrizzleOrderRepository`       |
 
 Auth accesses user persistence through its `IAuthUsers` port, backed by the
 users service. Admin orchestrates the application repository and users service
@@ -150,7 +155,8 @@ their own profiles, remove their profile image, change their password, inspect
 or revoke refresh-token sessions, and delete their account after confirming
 their password. Password changes revoke refresh-token sessions. Account
 deletion cascades through related database rows and attempts to remove owned
-profile/store/product media from Cloudinary.
+profile/store/product media from Cloudinary. Orders are retained with an
+anonymized customer reference and their checkout-time snapshots.
 
 Admin-only user routes list users and read a user by UUID. These return safe
 user profiles with roles rather than password hashes.
@@ -204,6 +210,24 @@ both for motor vehicles. Riders control their availability independently from
 profile edits. Delivery assignment is intentionally deferred until the order
 domain exists.
 
+## Checkout and rider assignment
+
+The cart has no separate ID; its composite item keys and authenticated user ID
+identify it. Checkout creates immutable `orders` and `order_items` snapshots
+rather than retaining a reference to mutable cart rows.
+
+Within one database transaction, checkout locks cart products, validates status
+and stock, locks the longest-waiting available rider with `SKIP LOCKED`, creates
+the order/item snapshots, decrements inventory, marks the rider unavailable,
+and clears the cart. Concurrent checkouts therefore cannot reserve the same
+rider or oversell locked stock.
+
+Location is deliberately absent from this demo. Production proximity dispatch
+would require consent, frequent coordinate updates, geospatial indexes, stale
+location handling, and a distance-ranking strategy. FIFO availability still
+demonstrates authorization, transactions, locking, assignment, and state
+transitions without unnecessary infrastructure.
+
 ## Persistence model
 
 ```mermaid
@@ -220,6 +244,10 @@ erDiagram
     USERS ||--o{ REVIEWS : writes
     PRODUCTS ||--o{ REVIEWS : receives
     USERS ||--o| RIDER_PROFILES : has
+    USERS ||--o{ ORDERS : places
+    RIDER_PROFILES ||--o{ ORDERS : fulfills
+    ORDERS ||--|{ ORDER_ITEMS : contains
+    PRODUCTS ||--o{ ORDER_ITEMS : snapshots
 
     USERS {
         uuid id PK
@@ -287,6 +315,25 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+    ORDERS {
+        uuid id PK
+        uuid user_id FK
+        uuid rider_profile_id FK
+        string status
+        jsonb delivery_address
+        numeric subtotal
+        numeric delivery_fee
+        numeric total
+    }
+    ORDER_ITEMS {
+        uuid id PK
+        uuid order_id FK
+        uuid product_id FK
+        string product_name
+        numeric unit_price
+        integer quantity
+        numeric line_total
+    }
 ```
 
 `REVIEWS` has a unique `(product_id, user_id)` index, a database check requiring
@@ -329,7 +376,7 @@ remaining authors rotate through the other seeded customers.
 
 Implemented functionality covers authentication, account management, seller
 applications and review, stores, seller-managed products, public product
-catalog browsing, persistent shopping carts, and product reviews. Checkout,
-orders, delivery assignment, delivery addresses, and wishlists are not present
-in the current codebase. Rider vehicle profiles and availability are
-implemented as preparation for the future delivery workflow.
+catalog browsing, persistent shopping carts, product reviews, rider profiles,
+transactional checkout, product orders, automatic available-rider assignment,
+and fulfillment status. Payment processing, live location/proximity dispatch,
+refunds, and wishlists are not present in the current codebase.

@@ -15,6 +15,7 @@ export interface IRiderRepository {
     userId: string,
     isAvailable: boolean,
   ): Promise<RiderProfile | undefined>;
+  hasActiveOrder(userId: string): Promise<boolean>;
 }
 
 export const IRiderRepository = Symbol('IRiderRepository');
