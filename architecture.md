@@ -15,6 +15,7 @@ flowchart LR
     Catalog[Public catalog module]
     Cart[Shopping cart module]
     Reviews[Product reviews module]
+    Rider[Rider profile module]
     Admin[Application and admin modules]
     DB[(PostgreSQL on Neon)]
     Cloudinary[Cloudinary]
@@ -26,12 +27,14 @@ flowchart LR
     API --> Catalog
     API --> Cart
     API --> Reviews
+    API --> Rider
     API --> Admin
     Auth --> DB
     Seller --> DB
     Catalog --> DB
     Cart --> DB
     Reviews --> DB
+    Rider --> DB
     Admin --> DB
     Auth --> Cloudinary
     Seller --> Cloudinary
@@ -41,9 +44,9 @@ flowchart LR
 ## Application composition
 
 `AppModule` loads environment configuration and composes the database, auth,
-Cloudinary, Resend, application, admin, seller, catalog, cart, and reviews
-modules. `DatabaseModule` is global and provides the Neon-backed Drizzle client
-and role reader.
+Cloudinary, Resend, application, admin, seller, catalog, cart, reviews, and
+rider modules. `DatabaseModule` is global and provides the Neon-backed Drizzle
+client and role reader.
 
 At startup, `main.ts` installs cookie parsing and a global `ValidationPipe`
 with transformation enabled. Controllers bind HTTP routes and DTOs; services
@@ -73,12 +76,13 @@ flowchart TD
 | `auth`                      | Signup, email verification, login, refresh-token rotation, logout                           |
 | `users`                     | Own profile, password, sessions, account deletion, and admin user lookups                   |
 | `application`               | Submit a request for seller or rider access                                                 |
-| `admin`                     | Review applications and grant the seller role when approved                                 |
+| `admin`                     | Review applications and grant the matching seller or rider role when approved               |
 | `seller/store`              | Create and manage stores and their Cloudinary images                                        |
 | `seller/product`            | Create and manage products, inventory fields, and product images                            |
 | `catalog`                   | Public active-product listing/details with search, price filtering, pagination, and sorting |
 | `cart`                      | Per-user persistent cart items with stock checks and computed totals                        |
 | `reviews`                   | Public product review lists and summaries; authenticated owner-controlled review mutations  |
+| `rider`                     | Rider-owned vehicle profiles and availability                                               |
 | `infrastructure/database`   | Drizzle schemas and implementations of persistence interfaces                               |
 | `infrastructure/cloudinary` | Upload and delete image assets                                                              |
 | `infrastructure/resend`     | Send email-verification messages                                                            |
@@ -112,6 +116,7 @@ Controller
 | Catalog                  | `ICatalogRepository`                | `DrizzleCatalogRepository`     |
 | Cart                     | `ICartRepository`                   | `DrizzleCartRepository`        |
 | Reviews                  | `IReviewRepository`                 | `DrizzleReviewRepository`      |
+| Riders                   | `IRiderRepository`                  | `DrizzleRiderRepository`       |
 
 Auth accesses user persistence through its `IAuthUsers` port, backed by the
 users service. Admin orchestrates the application repository and users service
@@ -135,9 +140,8 @@ database service directly.
    through the role-reader interface.
 
 Roles are `customer`, `seller`, `rider`, and `admin`. A user can have more than
-one role. Seller and rider roles are requested through applications; the
-current admin approval flow grants the seller role for an approved
-application.
+one role. Seller and rider roles are requested through applications. Approval
+grants the role matching the application type.
 
 ## Account lifecycle
 
@@ -151,7 +155,7 @@ profile/store/product media from Cloudinary.
 Admin-only user routes list users and read a user by UUID. These return safe
 user profiles with roles rather than password hashes.
 
-## Seller application and ownership lifecycle
+## Seller/rider application and ownership lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -164,8 +168,8 @@ sequenceDiagram
     API->>DB: Save pending application for authenticated user ID
     Admin->>API: Review application
     API->>DB: Update status and review details
-    alt application approved as seller
-        API->>DB: Assign seller role to applicant
+    alt application approved
+        API->>DB: Assign role matching application type
     end
 ```
 
@@ -194,6 +198,12 @@ repository condition, so only the author can mutate the row. Public product
 review queries provide pagination, rating filtering, sorting, average rating,
 and a star-count distribution.
 
+An approved rider can create one rider profile containing vehicle and document
+details. Plate and license identifiers are unique, and the service requires
+both for motor vehicles. Riders control their availability independently from
+profile edits. Delivery assignment is intentionally deferred until the order
+domain exists.
+
 ## Persistence model
 
 ```mermaid
@@ -209,6 +219,7 @@ erDiagram
     PRODUCTS ||--o{ CART_ITEMS : selected_in
     USERS ||--o{ REVIEWS : writes
     PRODUCTS ||--o{ REVIEWS : receives
+    USERS ||--o| RIDER_PROFILES : has
 
     USERS {
         uuid id PK
@@ -266,6 +277,16 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+    RIDER_PROFILES {
+        uuid id PK
+        uuid user_id FK, UK
+        string vehicle_type
+        string plate_number UK
+        string license_number UK
+        boolean is_available
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
 
 `REVIEWS` has a unique `(product_id, user_id)` index, a database check requiring
@@ -309,5 +330,6 @@ remaining authors rotate through the other seeded customers.
 Implemented functionality covers authentication, account management, seller
 applications and review, stores, seller-managed products, public product
 catalog browsing, persistent shopping carts, and product reviews. Checkout,
-orders, delivery addresses, and wishlists are not present in the current
-codebase.
+orders, delivery assignment, delivery addresses, and wishlists are not present
+in the current codebase. Rider vehicle profiles and availability are
+implemented as preparation for the future delivery workflow.

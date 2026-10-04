@@ -7,3 +7,4 @@ export * from './store.schema';
 export * from './product.schema';
 export * from './cart.schema';
 export * from './review.schema';
+export * from './rider.schema';

@@ -12,6 +12,7 @@ import { SellerModule } from './modules/seller/seller.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CartModule } from './modules/cart/cart.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { RiderModule } from './modules/rider/rider.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
     CatalogModule,
     CartModule,
     ReviewsModule,
+    RiderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

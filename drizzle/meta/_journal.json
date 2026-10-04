@@ -43,6 +43,13 @@
       "when": 1791010544798,
       "tag": "0005_curvy_mentallo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791101310150,
+      "tag": "0006_nice_starfox",
+      "breakpoints": true
     }
   ]
 }

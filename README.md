@@ -1,14 +1,15 @@
 # E-Commerce API
 
 A NestJS REST API for account and authentication flows, seller applications,
-store and product management, catalog browsing, shopping carts, and product
-reviews. PostgreSQL stores application data; Cloudinary stores uploaded images;
-Resend sends email-verification messages.
+store and product management, catalog browsing, shopping carts, product
+reviews, and rider profiles. PostgreSQL stores application data; Cloudinary
+stores uploaded images; Resend sends email-verification messages.
 
 This repository currently covers the backend foundation, seller workflows,
 public product catalog browsing, persistent shopping carts, and user-owned
-product reviews. Checkout, orders, addresses, and wishlists are not implemented
-yet.
+product reviews. Approved riders can manage vehicle details and availability.
+Checkout, orders, delivery assignment, addresses, and wishlists are not
+implemented yet.
 
 ## Stack
 
@@ -197,14 +198,14 @@ Account deletion body:
 Account deletion cascades through owned database records and attempts to remove
 the account's profile, store, and product images from Cloudinary.
 
-### Seller applications and administration
+### Seller/rider applications and administration
 
-| Method  | Endpoint                             | Access        | Description                                                               |
-| ------- | ------------------------------------ | ------------- | ------------------------------------------------------------------------- |
-| `POST`  | `/application/create`                | Authenticated | Submit a `seller` or `rider` application                                  |
-| `GET`   | `/admin/applications?status=pending` | Admin         | List applications, optionally filtered by status                          |
-| `PATCH` | `/admin/approve-applications/:id`    | Admin         | Review/update an application; approved applicants receive the seller role |
-| `PATCH` | `/admin/reject-applications/:id`     | Admin         | Reject an application and optionally provide a reason                     |
+| Method  | Endpoint                             | Access        | Description                                                             |
+| ------- | ------------------------------------ | ------------- | ----------------------------------------------------------------------- |
+| `POST`  | `/application/create`                | Authenticated | Submit a `seller` or `rider` application                                |
+| `GET`   | `/admin/applications?status=pending` | Admin         | List applications, optionally filtered by status                        |
+| `PATCH` | `/admin/approve-applications/:id`    | Admin         | Approve an application and grant its corresponding seller or rider role |
+| `PATCH` | `/admin/reject-applications/:id`     | Admin         | Reject an application and optionally provide a reason                   |
 
 ### Stores — `/store`
 
@@ -299,6 +300,25 @@ distribution, and pagination metadata. See
 [`src/modules/reviews/REVIEWS_API.md`](src/modules/reviews/REVIEWS_API.md) for
 request examples.
 
+### Rider profiles — `/rider`
+
+Rider routes require an access token and the `rider` role. Users receive this
+role when an administrator approves a rider application. Each rider has at most
+one profile and can manage only their own profile.
+
+| Method  | Endpoint              | Access | Description                              |
+| ------- | --------------------- | ------ | ---------------------------------------- |
+| `POST`  | `/rider/profile`      | Rider  | Create vehicle and rider profile details |
+| `GET`   | `/rider/profile`      | Rider  | Get the current rider's profile          |
+| `PATCH` | `/rider/profile`      | Rider  | Update vehicle or document details       |
+| `PATCH` | `/rider/availability` | Rider  | Set current availability                 |
+
+Vehicle types are `bicycle`, `motorcycle`, `car`, and `van`. Motor vehicles
+require unique plate and license numbers; bicycles do not. New profiles start
+unavailable. See
+[`src/modules/rider/RIDER_API.md`](src/modules/rider/RIDER_API.md) for request
+examples and validation rules.
+
 ## Repository layout
 
 ```text
@@ -315,6 +335,7 @@ src/
     ├── cart/                # Persistent user carts and stock validation
     ├── catalog/             # Public product discovery and filtering
     ├── reviews/             # Product reviews, summaries, and ownership rules
+    ├── rider/               # Rider vehicle profiles and availability
     ├── seller/              # Store and product management
     └── users/               # Profile, sessions, and account management
 ```
