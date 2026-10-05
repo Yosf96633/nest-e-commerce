@@ -10,6 +10,7 @@ import {
 import { sql, relations } from 'drizzle-orm';
 import { users } from './users.schema';
 import { refreshTokens } from './refresh-tokens.schema';
+import { authSessions } from './auth-sessions.schema';
 import { emailVerificationTokens } from './email-verification-tokens.schema';
 import { userRoles } from './user-roles.schema';
 import { applications } from './application.schema';
@@ -97,6 +98,8 @@ export const storesRelations = relations(stores, ({ one, many }) => ({
 export const usersRelations = relations(users, ({ many }) => ({
   /** Active/past refresh tokens for this user */
   refreshTokens: many(refreshTokens),
+  /** Login sessions for this user */
+  authSessions: many(authSessions),
   /** Email verification tokens issued to this user */
   emailVerificationTokens: many(emailVerificationTokens),
   /** Roles assigned to this user */

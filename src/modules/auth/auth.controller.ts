@@ -57,10 +57,7 @@ export class AuthController {
     @Body() body?: RefreshTokenDto,
   ) {
     const refreshToken = req.cookies?.['refresh_token'] || body?.refreshToken;
-    return this.authService.refreshToken(refreshToken, res, {
-      userAgent: req.get('user-agent'),
-      ipAddress: req.ip,
-    });
+    return this.authService.refreshToken(refreshToken, res);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -70,7 +67,6 @@ export class AuthController {
     return this.authService.getProtectedData(req.user.sub);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(200)
   async logout(

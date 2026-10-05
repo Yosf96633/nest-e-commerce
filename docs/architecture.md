@@ -233,7 +233,8 @@ transitions without unnecessary infrastructure.
 ```mermaid
 erDiagram
     USERS ||--o{ USER_ROLES : has
-    USERS ||--o{ REFRESH_TOKENS : signs_in_with
+    USERS ||--o{ AUTH_SESSIONS : signs_in_with
+    AUTH_SESSIONS ||--o{ REFRESH_TOKENS : rotates
     USERS ||--o{ EMAIL_VERIFICATION_TOKENS : verifies
     USERS ||--o{ APPLICATIONS : submits
     USERS ||--o{ STORES : owns
@@ -259,14 +260,21 @@ erDiagram
         uuid user_id PK, FK
         string role PK
     }
-    REFRESH_TOKENS {
+    AUTH_SESSIONS {
         uuid id PK
         uuid user_id FK
-        string token_hash
         timestamp expires_at
         timestamp revoked_at
         string user_agent
         string ip_address
+    }
+    REFRESH_TOKENS {
+        uuid id PK
+        uuid user_id FK
+        uuid session_id FK
+        string token_hash
+        timestamp expires_at
+        timestamp revoked_at
     }
     APPLICATIONS {
         uuid id PK

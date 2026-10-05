@@ -12,6 +12,10 @@ import {
   UserWithRoles,
 } from './entities/user.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import {
+  AuthSession,
+  CreateAuthSessionData,
+} from './entities/auth-session.entity';
 import { Role } from '@/common/types/role.type';
 import {
   type IUsersRepository,
@@ -113,29 +117,28 @@ export class UsersService {
     await this.usersRepository.update(userId, {
       passwordHash: await HashingUtil.hashPassword(newPassword),
     });
-    await this.usersRepository.revokeAllRefreshTokens(userId);
+    await this.usersRepository.revokeAllSessions(userId);
     return {
       message: 'Password changed. Please sign in again on your devices.',
     };
   }
 
   async getSessions(userId: string) {
-    const tokens =
-      await this.usersRepository.findActiveRefreshTokensByUserId(userId);
-    return tokens.map(({ id, createdAt, expiresAt, userAgent, ipAddress }) => ({
-      id,
-      createdAt,
-      expiresAt,
-      userAgent,
-      ipAddress,
-    }));
+    const sessions =
+      await this.usersRepository.findActiveSessionsByUserId(userId);
+    return sessions.map(
+      ({ id, createdAt, expiresAt, userAgent, ipAddress }) => ({
+        id,
+        createdAt,
+        expiresAt,
+        userAgent,
+        ipAddress,
+      }),
+    );
   }
 
   async revokeSession(userId: string, sessionId: string): Promise<void> {
-    const revoked = await this.usersRepository.revokeRefreshToken(
-      userId,
-      sessionId,
-    );
+    const revoked = await this.usersRepository.revokeSession(userId, sessionId);
     if (!revoked) {
       throw new NotFoundException(
         'Active session not found',
@@ -145,8 +148,7 @@ export class UsersService {
   }
 
   async revokeAllSessions(userId: string): Promise<{ revokedCount: number }> {
-    const revokedCount =
-      await this.usersRepository.revokeAllRefreshTokens(userId);
+    const revokedCount = await this.usersRepository.revokeAllSessions(userId);
     return { revokedCount };
   }
 
@@ -248,35 +250,39 @@ export class UsersService {
     return this.usersRepository.assignRole(userId, role);
   }
 
-  async storeRefreshToken(
-    userId: string,
-    refreshToken: string,
-    expiresAt: Date,
-    metadata?: { userAgent?: string; ipAddress?: string },
-  ): Promise<RefreshToken> {
-    return this.usersRepository.storeRefreshToken(
-      userId,
-      refreshToken,
-      expiresAt,
-      metadata,
-    );
+  async createSessionWithRefreshToken(
+    session: CreateAuthSessionData,
+    token: { id: string; tokenHash: string; expiresAt: Date },
+  ): Promise<void> {
+    return this.usersRepository.createSessionWithRefreshToken(session, token);
   }
 
-  async findActiveRefreshTokensByUserId(
-    userId: string,
-  ): Promise<RefreshToken[]> {
-    return this.usersRepository.findActiveRefreshTokensByUserId(userId);
-  }
-
-  async revokeRefreshToken(
+  async findRefreshTokenById(
     userId: string,
     tokenId: string,
-    replacedByTokenId?: string,
+  ): Promise<RefreshToken | undefined> {
+    return this.usersRepository.findRefreshTokenById(userId, tokenId);
+  }
+
+  async rotateRefreshToken(
+    userId: string,
+    sessionId: string,
+    currentTokenId: string,
+    newToken: { id: string; tokenHash: string; expiresAt: Date },
   ): Promise<boolean> {
-    return this.usersRepository.revokeRefreshToken(
+    return this.usersRepository.rotateRefreshToken(
       userId,
-      tokenId,
-      replacedByTokenId,
+      sessionId,
+      currentTokenId,
+      newToken,
     );
+  }
+
+  async findActiveSessionsByUserId(userId: string): Promise<AuthSession[]> {
+    return this.usersRepository.findActiveSessionsByUserId(userId);
+  }
+
+  async revokeSessionById(userId: string, sessionId: string): Promise<boolean> {
+    return this.usersRepository.revokeSession(userId, sessionId);
   }
 }

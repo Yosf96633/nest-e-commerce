@@ -19,13 +19,24 @@ import type {
   CreateEmailVerificationTokenData,
   EmailVerificationToken,
 } from './entities/email-verification-token.entity';
-import type { AuthRefreshToken } from './entities/refresh-token.entity';
 import { EMAIL_VERIFICATION_TOKEN_URL } from './auth.constants';
-import { ResendService } from 'src/infrastructure/resend/resend.service';
+import { ResendService } from '@/infrastructure/resend/resend.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
+import { randomUUID } from 'crypto';
+
+interface RefreshJwtPayload {
+  sub: string;
+  email: string;
+  sid: string;
+  jti: string;
+  type: 'refresh';
+  exp?: number;
+}
+
+type TokenDuration = `${number}${'s' | 'm' | 'h' | 'd'}`;
 
 @Injectable()
 export class AuthService {
@@ -43,29 +54,63 @@ export class AuthService {
 
   private async generateAccessAndRefreshToken(
     user: AuthUser,
+    sessionId: string,
+    refreshTokenId: string,
+    refreshTokenExpiresIn: TokenDuration,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     //Generate JWT Access Token
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
+      sid: sessionId,
+      type: 'access',
     });
     //Generate Refresh Token using jwt and hash it
     const refreshToken = await this.jwtService.signAsync(
       {
         sub: user.id,
         email: user.email,
+        sid: sessionId,
+        jti: refreshTokenId,
+        type: 'refresh',
       },
       {
         secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-        expiresIn: this.configService.get<string>(
-          'REFRESH_TOKEN_EXPIRATION_TIME',
-        ) as any,
+        expiresIn: refreshTokenExpiresIn,
       },
     );
     return {
       accessToken,
       refreshToken,
     };
+  }
+
+  private getRefreshTokenDuration(): TokenDuration {
+    const configured =
+      this.configService.get<string>('REFRESH_TOKEN_EXPIRATION_TIME') ?? '7d';
+    const match = /^(\d+)([smhd])$/.exec(configured);
+    if (!match) {
+      throw new InternalServerErrorException(
+        'Invalid refresh token expiration configuration',
+        'INVALID_REFRESH_TOKEN_EXPIRATION',
+      );
+    }
+    return configured as TokenDuration;
+  }
+
+  private getRefreshTokenExpiresAt(duration: TokenDuration): Date {
+    const match = /^(\d+)([smhd])$/.exec(duration)!;
+    const unitInMilliseconds = {
+      s: 1_000,
+      m: 60_000,
+      h: 3_600_000,
+      d: 86_400_000,
+    } as const;
+    return new Date(
+      Date.now() +
+        Number(match[1]) *
+          unitInMilliseconds[match[2] as keyof typeof unitInMilliseconds],
+    );
   }
 
   async signup(signupDto: SignUpDto) {
@@ -230,22 +275,30 @@ export class AuthService {
     }
 
     //generate access and refresh token
+    const refreshTokenExpiresIn = this.getRefreshTokenDuration();
+    const sessionId = randomUUID();
+    const refreshTokenId = randomUUID();
     const { accessToken, refreshToken } =
-      await this.generateAccessAndRefreshToken(user);
+      await this.generateAccessAndRefreshToken(
+        user,
+        sessionId,
+        refreshTokenId,
+        refreshTokenExpiresIn,
+      );
 
     // Store refresh token in the database
-    const durationInDays = 15;
-    // current time + (15 days * 24 hours * 60 minutes * 60 seconds * 1000 milliseconds)
-    const expiresAt = new Date(
-      Date.now() + durationInDays * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = this.getRefreshTokenExpiresAt(refreshTokenExpiresIn);
 
     const hashedRefreshToken = await TokenUtility.hashToken(refreshToken);
-    await this.userService.storeRefreshToken(
-      user.id,
-      hashedRefreshToken,
-      expiresAt,
-      metadata,
+    await this.userService.createSessionWithRefreshToken(
+      {
+        id: sessionId,
+        userId: user.id,
+        expiresAt,
+        userAgent: metadata?.userAgent,
+        ipAddress: metadata?.ipAddress,
+      },
+      { id: refreshTokenId, tokenHash: hashedRefreshToken, expiresAt },
     );
 
     response.cookie('refresh_token', refreshToken, {
@@ -263,11 +316,7 @@ export class AuthService {
     };
   }
 
-  async refreshToken(
-    refreshTokenFromReq: string,
-    response: Response,
-    metadata?: { userAgent?: string; ipAddress?: string },
-  ) {
+  async refreshToken(refreshTokenFromReq: string, response: Response) {
     if (!refreshTokenFromReq) {
       throw new UnauthorizedException(
         'Refresh token is required',
@@ -275,14 +324,29 @@ export class AuthService {
       );
     }
 
-    let payload: any;
+    let payload: RefreshJwtPayload;
     try {
-      payload = await this.jwtService.verifyAsync(refreshTokenFromReq, {
-        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-      });
+      payload = await this.jwtService.verifyAsync<RefreshJwtPayload>(
+        refreshTokenFromReq,
+        {
+          secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
+        },
+      );
     } catch {
       throw new UnauthorizedException(
         'Invalid or expired refresh token',
+        'INVALID_REFRESH_TOKEN',
+      );
+    }
+
+    if (
+      payload.type !== 'refresh' ||
+      !payload.sid ||
+      !payload.jti ||
+      !payload.sub
+    ) {
+      throw new UnauthorizedException(
+        'Invalid refresh token',
         'INVALID_REFRESH_TOKEN',
       );
     }
@@ -292,49 +356,62 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
-    const activeTokens =
-      await this.userService.findActiveRefreshTokensByUserId(userId);
-    let matchedTokenRecord: AuthRefreshToken | undefined;
-
-    for (const tokenRecord of activeTokens) {
-      const isValid = await TokenUtility.compareToken(
+    const tokenRecord = await this.userService.findRefreshTokenById(
+      userId,
+      payload.jti,
+    );
+    if (
+      !tokenRecord ||
+      tokenRecord.sessionId !== payload.sid ||
+      !(await TokenUtility.compareToken(
         refreshTokenFromReq,
         tokenRecord.tokenHash,
-      );
-      if (isValid) {
-        matchedTokenRecord = tokenRecord;
-        break;
-      }
-    }
-
-    if (!matchedTokenRecord) {
+      ))
+    ) {
       throw new UnauthorizedException(
         'Invalid or revoked refresh token',
         'INVALID_REFRESH_TOKEN',
       );
     }
 
-    const { accessToken, refreshToken: newRefreshToken } =
-      await this.generateAccessAndRefreshToken(user);
+    if (tokenRecord.revokedAt || tokenRecord.expiresAt <= new Date()) {
+      await this.userService.revokeSessionById(userId, payload.sid);
+      throw new UnauthorizedException(
+        'Refresh token reuse detected',
+        'REFRESH_TOKEN_REUSED',
+      );
+    }
 
-    const durationInDays = 15;
-    const expiresAt = new Date(
-      Date.now() + durationInDays * 24 * 60 * 60 * 1000,
-    );
+    const refreshTokenExpiresIn = this.getRefreshTokenDuration();
+    const newRefreshTokenId = randomUUID();
+    const { accessToken, refreshToken: newRefreshToken } =
+      await this.generateAccessAndRefreshToken(
+        user,
+        payload.sid,
+        newRefreshTokenId,
+        refreshTokenExpiresIn,
+      );
+
+    const expiresAt = this.getRefreshTokenExpiresAt(refreshTokenExpiresIn);
     const hashedRefreshToken = await TokenUtility.hashToken(newRefreshToken);
 
-    const newRefreshTokenRecord = await this.userService.storeRefreshToken(
+    const rotated = await this.userService.rotateRefreshToken(
       user.id,
-      hashedRefreshToken,
-      expiresAt,
-      metadata,
+      payload.sid,
+      payload.jti,
+      {
+        id: newRefreshTokenId,
+        tokenHash: hashedRefreshToken,
+        expiresAt,
+      },
     );
-
-    await this.userService.revokeRefreshToken(
-      user.id,
-      matchedTokenRecord.id,
-      newRefreshTokenRecord.id,
-    );
+    if (!rotated) {
+      await this.userService.revokeSessionById(user.id, payload.sid);
+      throw new UnauthorizedException(
+        'Refresh token reuse detected',
+        'REFRESH_TOKEN_REUSED',
+      );
+    }
 
     response.cookie('refresh_token', newRefreshToken, {
       httpOnly: true,
@@ -367,6 +444,12 @@ export class AuthService {
   }
 
   async logout(refreshToken: string, response: Response) {
+    response.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/auth',
+    });
     if (!refreshToken) {
       throw new UnauthorizedException(
         'Refresh token is required',
@@ -374,14 +457,29 @@ export class AuthService {
       );
     }
 
-    let payload: any;
+    let payload: RefreshJwtPayload;
     try {
-      payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-      });
+      payload = await this.jwtService.verifyAsync<RefreshJwtPayload>(
+        refreshToken,
+        {
+          secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
+        },
+      );
     } catch {
       throw new UnauthorizedException(
         'Invalid or expired refresh token',
+        'INVALID_REFRESH_TOKEN',
+      );
+    }
+
+    if (
+      payload.type !== 'refresh' ||
+      !payload.sid ||
+      !payload.jti ||
+      !payload.sub
+    ) {
+      throw new UnauthorizedException(
+        'Invalid refresh token',
         'INVALID_REFRESH_TOKEN',
       );
     }
@@ -392,36 +490,22 @@ export class AuthService {
       throw new UnauthorizedException('User not found', 'USER_NOT_FOUND');
     }
 
-    const activeTokens =
-      await this.userService.findActiveRefreshTokensByUserId(userId);
-    let matchedTokenRecord: AuthRefreshToken | undefined;
-
-    for (const tokenRecord of activeTokens) {
-      const isValid = await TokenUtility.compareToken(
-        refreshToken,
-        tokenRecord.tokenHash,
-      );
-      if (isValid) {
-        matchedTokenRecord = tokenRecord;
-        break;
-      }
-    }
-
-    if (!matchedTokenRecord) {
+    const tokenRecord = await this.userService.findRefreshTokenById(
+      userId,
+      payload.jti,
+    );
+    if (
+      !tokenRecord ||
+      tokenRecord.sessionId !== payload.sid ||
+      !(await TokenUtility.compareToken(refreshToken, tokenRecord.tokenHash))
+    ) {
       throw new UnauthorizedException(
         'Invalid or revoked refresh token',
         'INVALID_REFRESH_TOKEN',
       );
     }
 
-    await this.userService.revokeRefreshToken(user.id, matchedTokenRecord.id);
-
-    response.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/auth',
-    });
+    await this.userService.revokeSessionById(user.id, payload.sid);
 
     return {
       status: true,

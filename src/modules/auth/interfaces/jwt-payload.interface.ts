@@ -5,6 +5,9 @@ export interface JwtPayload {
   sub: string;
   /** User's current roles */
   email: string;
+  /** Stable login-session ID */
+  sid: string;
+  type: 'access';
   roles?: AuthRole[];
   /** Issued at (added automatically by @nestjs/jwt) */
   iat?: number;

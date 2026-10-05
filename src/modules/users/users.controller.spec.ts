@@ -21,6 +21,8 @@ describe('UsersController', () => {
     const user: JwtPayload = {
       sub: '20243823-e478-46ab-a612-09f2c116b11e',
       email: 'seller@example.com',
+      sid: '0e4f694c-5ac5-4fca-8d7d-a79767807582',
+      type: 'access',
     };
 
     await controller.updateProfile(user, { firstName: 'Updated' });

@@ -1,5 +1,9 @@
 import { AuthUser, CreateAuthUserData } from '../entities/auth-user.entity';
 import { AuthRefreshToken } from '../entities/refresh-token.entity';
+import {
+  AuthSession,
+  CreateAuthSessionData,
+} from '@/modules/users/entities/auth-session.entity';
 import { AuthRole } from '../types/role.type';
 
 export interface IAuthUsers {
@@ -10,19 +14,23 @@ export interface IAuthUsers {
   markEmailVerified(userId: string): Promise<void>;
   getRoles(userId: string): Promise<AuthRole[]>;
   assignRole(userId: string, role: AuthRole): Promise<void>;
-  storeRefreshToken(
-    userId: string,
-    refreshToken: string,
-    expiresAt: Date,
-    metadata?: { userAgent?: string; ipAddress?: string },
-  ): Promise<AuthRefreshToken>;
-  findActiveRefreshTokensByUserId(userId: string): Promise<AuthRefreshToken[]>;
-  revokeRefreshToken(
+  createSessionWithRefreshToken(
+    session: CreateAuthSessionData,
+    token: { id: string; tokenHash: string; expiresAt: Date },
+  ): Promise<void>;
+  findRefreshTokenById(
     userId: string,
     tokenId: string,
-    replacedByTokenId?: string,
+  ): Promise<AuthRefreshToken | undefined>;
+  rotateRefreshToken(
+    userId: string,
+    sessionId: string,
+    currentTokenId: string,
+    newToken: { id: string; tokenHash: string; expiresAt: Date },
   ): Promise<boolean>;
-  revokeAllRefreshTokens(userId: string): Promise<number>;
+  findActiveSessionsByUserId(userId: string): Promise<AuthSession[]>;
+  revokeSessionById(userId: string, sessionId: string): Promise<boolean>;
+  revokeAllSessions(userId: string): Promise<number>;
 }
 
 export const AUTH_USERS = Symbol('IAuthUsers');

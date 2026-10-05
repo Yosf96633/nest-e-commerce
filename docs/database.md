@@ -16,7 +16,8 @@ live under `src/infrastructure/database/repositories/`.
 | --------------------------- | ---------------------------------- | ------------------------------------------------------------------------------ |
 | `users`                     | Account identity and profile       | Unique email; password hash required                                           |
 | `user_roles`                | Many-to-many user role assignments | Composite primary key `(user_id, role)`                                        |
-| `refresh_tokens`            | Hashed refresh-token sessions      | Belongs to a user; supports expiration and revocation                          |
+| `auth_sessions`             | Stable login/device sessions       | Belongs to a user; supports expiration and immediate revocation                |
+| `refresh_tokens`            | Rotating refresh credentials       | Belongs to a session; hashed token with rotation/revocation state              |
 | `email_verification_tokens` | Email-verification state           | Belongs to a user                                                              |
 | `applications`              | Seller/rider access requests       | Type/status enums; indexed by user, type, and status                           |
 | `stores`                    | Seller-owned storefronts           | Unique slug; cascades when seller is deleted                                   |
@@ -32,7 +33,8 @@ live under `src/infrastructure/database/repositories/`.
 ```mermaid
 erDiagram
     USERS ||--o{ USER_ROLES : has
-    USERS ||--o{ REFRESH_TOKENS : owns
+    USERS ||--o{ AUTH_SESSIONS : owns
+    AUTH_SESSIONS ||--o{ REFRESH_TOKENS : rotates
     USERS ||--o{ EMAIL_VERIFICATION_TOKENS : verifies_with
     USERS ||--o{ APPLICATIONS : submits
     USERS ||--o{ STORES : owns

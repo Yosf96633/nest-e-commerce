@@ -21,7 +21,7 @@ import { AUTH_USERS } from './interfaces/auth-users.interface';
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: config.get<string>('NODE_ENV') === 'production' ? '1h' : '1d' },
+        signOptions: { expiresIn: config.get<string>('NODE_ENV') === 'production' ? '1h' : '5m' },
       })
     }),
     UsersModule, ResendModule],

@@ -2,15 +2,20 @@ import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let userService: { create: jest.Mock };
+  let userService: { create: jest.Mock; findByEmail: jest.Mock };
 
   beforeEach(() => {
     userService = {
       create: jest.fn().mockResolvedValue({ id: 'user-1' }),
+      findByEmail: jest.fn().mockResolvedValue(undefined),
     };
 
-    const emailVerificationTokenRepo = { create: jest.fn().mockResolvedValue({}) };
-    const resendService = { send_verification_email: jest.fn().mockResolvedValue('msg-id') };
+    const emailVerificationTokenRepo = {
+      create: jest.fn().mockResolvedValue({}),
+    };
+    const resendService = {
+      send_verification_email: jest.fn().mockResolvedValue('msg-id'),
+    };
 
     const jwtService = { signAsync: jest.fn(), verifyAsync: jest.fn() };
     const configService = { get: jest.fn() };

@@ -50,35 +50,39 @@ Protected requests send:
 Authorization: Bearer <access-token>
 ```
 
-The access-token payload contains identity information such as the user ID in
-`sub` and the email address. It intentionally excludes roles. Keeping the
+The access-token payload contains the user ID in `sub`, the email address, a
+stable session ID in `sid`, and `type: access`. It intentionally excludes roles.
+Keeping the
 database as the role source of truth means an approved seller or rider can use
 their new permissions without waiting for an old access token to expire.
 
 ## Refresh-token sessions
 
-Refresh tokens are signed separately, hashed before database storage, and
-associated with session information including expiration, user agent, and IP
-address when available.
+Each login creates an `auth_sessions` row. Its random `sid` remains stable for
+that device across refresh rotation and stores expiration, user agent, and IP
+address when available. Refresh tokens are signed separately and contain a
+random `jti` that selects one hashed `refresh_tokens` row directly.
 
 `POST /auth/refresh` performs rotation:
 
 1. Read the refresh token from the `refresh_token` cookie or request body.
 2. Verify its signature and expiration.
-3. Compare it with the persisted hash.
-4. Revoke the previous session record.
+3. Look up its `jti` and compare it with the persisted hash.
+4. Atomically revoke the previous refresh-token record and store its
+   replacement under the same `sid`.
 5. Issue a new access token and refresh token.
-6. Store the new refresh-token hash.
 
-Rotation limits reuse of a stolen old token. `POST /auth/logout` revokes the
-current refresh token. Password changes and explicit “revoke all sessions”
-operations revoke all stored sessions for that user.
+Reuse of a rotated token revokes its whole session. `POST /auth/logout`
+authenticates with the refresh token and revokes only its session. Password
+changes and explicit “revoke all sessions” operations revoke all sessions for
+that user.
 
 ## Guards and role checks
 
-`JwtAuthGuard` validates the bearer token and attaches its payload to the
-request. The `@CurrentUser()` decorator gives controllers access to that
-payload.
+`JwtAuthGuard` validates the bearer token, requires `type: access`, and checks
+that its `sid` is still active before attaching the payload to the request.
+This session lookup makes logout invalidate existing access tokens immediately.
+The `@CurrentUser()` decorator gives controllers access to that payload.
 
 `RoleGuard` reads roles declared through `@Roles(...)`. It resolves current
 roles through the role-reader interface backed by PostgreSQL and allows the

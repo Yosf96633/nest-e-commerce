@@ -5,6 +5,7 @@ import {
   users,
   userRoles,
   refreshTokens,
+  authSessions,
   stores,
   products,
 } from '../../schema';
@@ -16,6 +17,10 @@ import {
   UserWithRoles,
 } from '../../../../modules/users/entities/user.entity';
 import { RefreshToken } from '../../../../modules/users/entities/refresh-token.entity';
+import {
+  AuthSession,
+  CreateAuthSessionData,
+} from '../../../../modules/users/entities/auth-session.entity';
 import { Role } from '@/common/types/role.type';
 
 @Injectable()
@@ -158,72 +163,152 @@ export class DrizzleUsersRepository implements IUsersRepository {
       .onConflictDoNothing();
   }
 
-  async storeRefreshToken(
-    userId: string,
-    refreshToken: string,
-    expiresAt: Date,
-    metadata?: { userAgent?: string; ipAddress?: string },
-  ): Promise<RefreshToken> {
-    const result = await this.db.client
-      .insert(refreshTokens)
-      .values({
-        userId,
-        tokenHash: refreshToken,
-        expiresAt,
-        userAgent: metadata?.userAgent,
-        ipAddress: metadata?.ipAddress,
-      })
-      .returning();
-    return this.toRefreshToken(result[0]);
+  async createSessionWithRefreshToken(
+    session: CreateAuthSessionData,
+    token: { id: string; tokenHash: string; expiresAt: Date },
+  ): Promise<void> {
+    await this.db.client.transaction(async (tx) => {
+      await tx.insert(authSessions).values(session);
+      await tx.insert(refreshTokens).values({
+        id: token.id,
+        userId: session.userId,
+        sessionId: session.id,
+        tokenHash: token.tokenHash,
+        expiresAt: token.expiresAt,
+      });
+    });
   }
 
-  async findActiveRefreshTokensByUserId(
+  async findRefreshTokenById(
     userId: string,
-  ): Promise<RefreshToken[]> {
+    tokenId: string,
+  ): Promise<RefreshToken | undefined> {
     const result = await this.db.client
       .select()
       .from(refreshTokens)
       .where(
+        and(eq(refreshTokens.id, tokenId), eq(refreshTokens.userId, userId)),
+      )
+      .limit(1);
+    return result[0] ? this.toRefreshToken(result[0]) : undefined;
+  }
+
+  async rotateRefreshToken(
+    userId: string,
+    sessionId: string,
+    currentTokenId: string,
+    newToken: { id: string; tokenHash: string; expiresAt: Date },
+  ): Promise<boolean> {
+    return this.db.client.transaction(async (tx) => {
+      const activeSession = await tx
+        .update(authSessions)
+        .set({ expiresAt: newToken.expiresAt })
+        .where(
+          and(
+            eq(authSessions.id, sessionId),
+            eq(authSessions.userId, userId),
+            isNull(authSessions.revokedAt),
+            gt(authSessions.expiresAt, new Date()),
+          ),
+        )
+        .returning({ id: authSessions.id });
+
+      if (!activeSession.length) {
+        return false;
+      }
+
+      const revoked = await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), replacedBy: newToken.id })
+        .where(
+          and(
+            eq(refreshTokens.id, currentTokenId),
+            eq(refreshTokens.userId, userId),
+            eq(refreshTokens.sessionId, sessionId),
+            isNull(refreshTokens.revokedAt),
+            gt(refreshTokens.expiresAt, new Date()),
+          ),
+        )
+        .returning({ id: refreshTokens.id });
+
+      if (!revoked.length) {
+        return false;
+      }
+
+      await tx.insert(refreshTokens).values({
+        id: newToken.id,
+        userId,
+        sessionId,
+        tokenHash: newToken.tokenHash,
+        expiresAt: newToken.expiresAt,
+      });
+      return true;
+    });
+  }
+
+  async findActiveSessionsByUserId(userId: string): Promise<AuthSession[]> {
+    const result = await this.db.client
+      .select()
+      .from(authSessions)
+      .where(
         and(
-          eq(refreshTokens.userId, userId),
-          isNull(refreshTokens.revokedAt),
-          gt(refreshTokens.expiresAt, new Date()),
+          eq(authSessions.userId, userId),
+          isNull(authSessions.revokedAt),
+          gt(authSessions.expiresAt, new Date()),
         ),
       );
-    return result.map((token) => this.toRefreshToken(token));
+    return result.map((session) => this.toAuthSession(session));
   }
 
-  async revokeRefreshToken(
-    userId: string,
-    tokenId: string,
-    replacedByTokenId?: string,
-  ): Promise<boolean> {
-    const result = await this.db.client
-      .update(refreshTokens)
-      .set({
-        revokedAt: new Date(),
-        replacedBy: replacedByTokenId ?? null,
-      })
-      .where(
-        and(
-          eq(refreshTokens.id, tokenId),
-          eq(refreshTokens.userId, userId),
-          isNull(refreshTokens.revokedAt),
-        ),
-      )
-      .returning({ id: refreshTokens.id });
-    return result.length > 0;
+  async revokeSession(userId: string, sessionId: string): Promise<boolean> {
+    return this.db.client.transaction(async (tx) => {
+      const result = await tx
+        .update(authSessions)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(authSessions.id, sessionId),
+            eq(authSessions.userId, userId),
+            isNull(authSessions.revokedAt),
+          ),
+        )
+        .returning({ id: authSessions.id });
+
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(refreshTokens.sessionId, sessionId),
+            eq(refreshTokens.userId, userId),
+            isNull(refreshTokens.revokedAt),
+          ),
+        );
+      return result.length > 0;
+    });
   }
 
-  async revokeAllRefreshTokens(userId: string): Promise<number> {
-    const result = await this.db.client
-      .update(refreshTokens)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)),
-      )
-      .returning({ id: refreshTokens.id });
-    return result.length;
+  async revokeAllSessions(userId: string): Promise<number> {
+    return this.db.client.transaction(async (tx) => {
+      const result = await tx
+        .update(authSessions)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(eq(authSessions.userId, userId), isNull(authSessions.revokedAt)),
+        )
+        .returning({ id: authSessions.id });
+
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(refreshTokens.userId, userId),
+            isNull(refreshTokens.revokedAt),
+          ),
+        );
+      return result.length;
+    });
   }
 
   private toUser(record: typeof users.$inferSelect): User {
@@ -263,11 +348,22 @@ export class DrizzleUsersRepository implements IUsersRepository {
     return {
       id: record.id,
       userId: record.userId,
+      sessionId: record.sessionId,
       tokenHash: record.tokenHash,
       expiresAt: record.expiresAt,
       createdAt: record.createdAt,
       revokedAt: record.revokedAt,
       replacedBy: record.replacedBy,
+    };
+  }
+
+  private toAuthSession(record: typeof authSessions.$inferSelect): AuthSession {
+    return {
+      id: record.id,
+      userId: record.userId,
+      expiresAt: record.expiresAt,
+      createdAt: record.createdAt,
+      revokedAt: record.revokedAt,
       userAgent: record.userAgent,
       ipAddress: record.ipAddress,
     };

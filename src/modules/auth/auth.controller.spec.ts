@@ -3,6 +3,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { SESSION_READER } from '@/common/interfaces/session-reader.interface';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -28,6 +29,10 @@ describe('AuthController', () => {
         {
           provide: ConfigService,
           useValue: { get: jest.fn() },
+        },
+        {
+          provide: SESSION_READER,
+          useValue: { isActive: jest.fn() },
         },
       ],
     }).compile();

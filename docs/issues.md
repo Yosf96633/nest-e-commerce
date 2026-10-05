@@ -169,15 +169,14 @@ stock update prevents inventory from being decremented below availability.
 
 ### Current State
 
-The production build compiles, and the newer service suites pass. During the
-documentation audit, the full unit run reported 14 passing suites and 9 failing
-suites (45 passing tests and 7 failing tests).
+The production build compiles, and the newer service suites pass. The latest
+full unit run reported 18 passing suites and 7 failing suites (53 passing tests
+and 7 failing tests).
 
 The remaining failures are mostly older scaffolding tests rather than proven
 business-logic regressions:
 
-- an auth import uses an unmapped `src/...` path in Jest;
-- controller tests omit JWT/role guard dependencies;
+- controller tests omit JWT/session/role guard dependencies;
 - older service tests omit repository-interface providers;
 - Cloudinary and Resend specs omit their injected client tokens.
 
@@ -203,3 +202,63 @@ a production commerce platform. It deliberately omits:
 
 These omissions are documented boundaries, not incomplete requirements for the
 current demo.
+
+---
+
+## 7. Logout Did Not Invalidate the Current Device's Access Token
+
+### Problem
+
+Each login creates a refresh-token database record, so one account can be
+signed in on several devices independently. Logout finds and revokes the
+refresh token supplied by the current client. However, protected routes only
+verify the access token's signature and expiration. An access token issued to
+the logged-out device therefore continues to authorize requests until it
+expires.
+
+The access and refresh JWT payloads also contained only the user ID and email.
+JWT timestamps have one-second resolution, so multiple logins for the same user
+within one second could produce identical tokens. Different bcrypt hashes of
+that identical refresh token could then be stored in several rows, making a
+database row an unreliable representation of a particular device session.
+
+Looking up refresh tokens was also inefficient: the service loaded every
+active token belonging to the user and ran bcrypt comparisons until one
+matched. Refresh rotation changed the identifier exposed as a session ID, and
+the existing `replaced_by` field described reuse detection that was not
+actually performed.
+
+### Solution Applied
+
+Authentication now distinguishes a login session from an individual refresh
+token:
+
+- `sid` is a random UUID identifying one device/login session;
+- `jti` is a random UUID identifying one refresh token in that session's
+  rotation chain;
+- access tokens contain `sub`, `email`, `sid`, and `type: access`;
+- refresh tokens contain `sub`, `email`, `sid`, `jti`, and `type: refresh`.
+
+Session state is stored separately from refresh-token records. The refresh
+token's public `jti` provides an indexed lookup selector, while the token hash
+is still compared before the credential is accepted. Rotation creates a new
+`jti` under the same `sid` and atomically revokes the previous refresh token.
+Reuse of a revoked refresh token revokes its whole session.
+
+`JwtAuthGuard` verifies the access JWT and then checks that its `sid` belongs to
+an active, unrevoked session for the token's user. Logout authenticates with
+the refresh token, revokes only that session, and clears the cookie. Other
+sessions belonging to the same account remain active. Logging out does not
+require a still-valid access token.
+
+Access-token hashes are deliberately not persisted. The indexed session check
+provides immediate revocation for every access token in that session without
+creating a database record for every access-token issuance.
+
+### Result
+
+Signing out on one device immediately rejects that device's existing access
+token and refresh token while leaving other devices signed in. Every login and
+refresh token has an unambiguous identifier, refresh lookup is direct, session
+IDs remain stable across rotation, and refresh-token replay can terminate the
+affected session.
